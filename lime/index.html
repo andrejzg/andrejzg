@@ -409,44 +409,16 @@
       </div>
     </section>
 
-    <!-- Single ride explorer -->
+    <!-- Monthly cost vs usage -->
     <section class="card">
-      <h2>Single ride · cost vs duration</h2>
-      <h3>How much for a <span id="duration-stat" class="stat">10<span class="unit">min</span></span> ride?</h3>
-
-      <div class="control-row">
-        <label for="duration">Duration</label>
-        <input id="duration" type="range" min="1" max="60" value="10" step="1" />
-      </div>
-
-      <div class="chart-wrap">
-        <svg class="chart" id="chart-single" viewBox="0 0 720 340" preserveAspectRatio="xMidYMid meet" aria-label="Cost vs ride duration"></svg>
-      </div>
-
-      <div class="legend" id="legend-single"></div>
-
-      <table class="results" id="results-single">
-        <thead>
-          <tr><th>Plan</th><th style="text-align:right;">This ride</th></tr>
-        </thead>
-        <tbody></tbody>
-      </table>
-
-      <p class="notes">
-        LimePass costs are shown as the <em>amortised</em> per-ride cost assuming you fully use the bundle within its expiry window. If you don't, the effective cost is higher. LimePrime costs exclude the £6.99 monthly fee — that's amortised in the next chart.
-      </p>
-    </section>
-
-    <!-- Monthly calculator -->
-    <section class="card">
-      <h2>Monthly cost · how often do you ride?</h2>
-      <h3>Pick your routine, see the cheapest plan.</h3>
+      <h2>Your monthly cost · vs how much you ride</h2>
+      <h3>Where do the plans cross over?</h3>
 
       <div class="calc-grid">
         <div class="field">
           <div class="field-label">Rides per week</div>
           <div class="field-value"><span id="rpw-val">5</span><span class="unit">/week</span></div>
-          <input id="rpw" type="range" min="1" max="40" value="5" step="1" />
+          <input id="rpw" type="range" min="0" max="40" value="5" step="1" />
         </div>
         <div class="field">
           <div class="field-label">Average ride length</div>
@@ -456,8 +428,17 @@
       </div>
 
       <div class="chart-wrap">
-        <svg class="chart" id="chart-monthly" viewBox="0 0 720 360" preserveAspectRatio="xMidYMid meet" aria-label="Monthly cost by plan"></svg>
+        <svg class="chart" id="chart-monthly" viewBox="0 0 720 380" preserveAspectRatio="xMidYMid meet" aria-label="Monthly cost vs rides per month"></svg>
       </div>
+
+      <div class="legend" id="legend-monthly"></div>
+
+      <table class="results" id="results-monthly">
+        <thead>
+          <tr><th>Plan</th><th style="text-align:right;">£ / month</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
 
       <div class="winner" id="winner">
         <span class="arrow">→</span>
@@ -465,7 +446,7 @@
       </div>
 
       <p class="notes">
-        Assumes 4.33 weeks/month. LimePass costs use the smallest combination of bundles that covers your monthly minutes; unused minutes within a bundle expire (so longer bundles need consistent use). All numbers based on London rates after the November 2025 hike (PAYG: £1 unlock + 31p/min).
+        X-axis is rides per month (= rides/week × 4.33). LimePass uses the cheapest combination of bundles that covers your monthly minutes — its line is stepped because you can only buy whole bundles, and any unused minutes expire. Numbers reflect London PAYG rates after the November 2025 hike (£1 unlock + 31p/min, with a £1 flat for rides under 5 min).
       </p>
     </section>
 
@@ -521,138 +502,25 @@
     ];
 
     // ============================================================
-    // CHART 1 — single ride
-    // ============================================================
-    const single = (function() {
-      const svg = d3.select('#chart-single');
-      const W = 720, H = 340;
-      const M = { top: 16, right: 18, bottom: 36, left: 44 };
-      const iw = W - M.left - M.right;
-      const ih = H - M.top - M.bottom;
-
-      const g = svg.append('g').attr('transform', `translate(${M.left},${M.top})`);
-
-      const x = d3.scaleLinear().domain([0, 60]).range([0, iw]);
-      const y = d3.scaleLinear().domain([0, 22]).nice().range([ih, 0]);
-
-      // Grid
-      g.append('g').attr('class', 'grid')
-        .call(d3.axisLeft(y).tickSize(-iw).tickFormat(''));
-
-      // Axes
-      g.append('g').attr('class', 'axis')
-        .attr('transform', `translate(0,${ih})`)
-        .call(d3.axisBottom(x).ticks(6).tickFormat(d => d + 'm'));
-      g.append('g').attr('class', 'axis')
-        .call(d3.axisLeft(y).ticks(5).tickFormat(d => '£' + d));
-
-      // Axis titles
-      g.append('text').attr('x', iw).attr('y', ih + 30).attr('text-anchor', 'end')
-        .attr('class', 'series-label').attr('fill', 'var(--text-faint)').text('ride duration');
-      g.append('text').attr('x', 0).attr('y', -4).attr('text-anchor', 'start')
-        .attr('class', 'series-label').attr('fill', 'var(--text-faint)').text('£ cost');
-
-      const line = d3.line()
-        .x(d => x(d.t))
-        .y(d => y(d.c))
-        .curve(d3.curveLinear);
-
-      const minutes = d3.range(0, 60.5, 0.5);
-      SERIES.forEach(s => {
-        const data = minutes.map(t => ({ t, c: s.fn(t) }));
-        g.append('path')
-          .datum(data)
-          .attr('class', 'series-line')
-          .attr('stroke', s.color)
-          .attr('opacity', 0.85)
-          .attr('d', line);
-
-        // End label
-        const last = data[data.length - 1];
-        g.append('text')
-          .attr('class', 'series-label')
-          .attr('x', x(last.t) + 4)
-          .attr('y', y(last.c) + 3)
-          .attr('fill', s.color)
-          .attr('opacity', 0.85)
-          .text(s.label);
-      });
-
-      // Cursor + dots
-      const cursor = g.append('line').attr('class', 'cursor-line').attr('y1', 0).attr('y2', ih);
-      const dotsG = g.append('g');
-      const dots = SERIES.map(s => dotsG.append('circle')
-        .attr('class', 'series-dot')
-        .attr('r', 4)
-        .attr('fill', s.color));
-
-      // Legend
-      const legend = d3.select('#legend-single');
-      legend.selectAll('span.entry')
-        .data(SERIES)
-        .enter()
-        .append('span')
-        .attr('class', 'entry')
-        .html(d => `<span class="swatch" style="background:${d.color}"></span>${d.label}`);
-
-      // Results table body
-      const tbody = d3.select('#results-single tbody');
-      const rows = tbody.selectAll('tr').data(SERIES).enter().append('tr');
-      rows.append('td').attr('class', 'name')
-        .html(d => `<span class="swatch" style="background:${d.color}"></span><span class="name">${d.label}</span><span class="sub">${d.sub}</span>`);
-      rows.append('td').attr('class', 'cost').attr('id', d => 'cost-' + d.id);
-
-      function update(t) {
-        cursor.attr('x1', x(t)).attr('x2', x(t));
-        const costs = SERIES.map(s => ({ s, c: s.fn(t) }));
-        const minCost = d3.min(costs, d => d.c);
-        costs.forEach((d, i) => {
-          dots[i].attr('cx', x(t)).attr('cy', y(d.c));
-        });
-        d3.select('#duration-stat').html(t + '<span class="unit">min</span>');
-        costs.forEach(d => {
-          const cell = d3.select('#cost-' + d.s.id);
-          cell.text('£' + d.c.toFixed(2));
-          cell.classed('win', Math.abs(d.c - minCost) < 0.001 && t > 0);
-          cell.classed('bad', d.c > minCost * 1.8);
-        });
-      }
-      return { update };
-    })();
-
-    document.getElementById('duration').addEventListener('input', e => {
-      single.update(+e.target.value);
-    });
-    single.update(10);
-
-    // ============================================================
-    // CHART 2 — monthly cost (bar chart with break-even info)
+    // Monthly cost — vs rides per month, with avg ride length slider
     // ============================================================
     const WEEKS_PER_MONTH = 4.33;
+    const MAX_RPW = 40;
+    const MAX_RPM = MAX_RPW * WEEKS_PER_MONTH;
 
-    function ridesPerMonth(rpw) { return rpw * WEEKS_PER_MONTH; }
-    function totalMinsPerMonth(rpw, avg) { return ridesPerMonth(rpw) * avg; }
-
-    function paygMonthly(rpw, avg) {
-      return ridesPerMonth(rpw) * paygCost(avg);
+    function paygMonthlyRides(rides, avg) {
+      return rides * paygCost(avg);
     }
-    function primeMonthly(rpw, avg) {
-      return PRIME.sub + ridesPerMonth(rpw) * primeRideCost(avg);
+    function primeMonthlyRides(rides, avg) {
+      return PRIME.sub + rides * primeRideCost(avg);
     }
-    // For LimePass, find the cheapest combination of bundles that
-    // covers the monthly minutes. Unused bundle minutes are wasted.
-    // Greedy with backtracking-lite: try each bundle as the "primary"
-    // and fill the remainder with the cheapest per-minute bundle.
-    function passMonthly(rpw, avg) {
-      const totalMins = totalMinsPerMonth(rpw, avg);
-      if (totalMins <= 0) return { cost: 0, breakdown: [] };
 
-      // Enumerate bundle counts with branch-and-bound pruning.
-      // Process bundles largest -> smallest so cheap-per-min options
-      // form an early upper bound, then prune branches that can't beat it.
-      const order = [3, 2, 1, 0]; // indices of BUNDLES, largest first
+    // Cheapest combination of bundles covering `totalMins`.
+    // Bundles must be bought whole; unused minutes expire.
+    function passByMins(totalMins) {
+      if (totalMins <= 0) return { cost: 0, counts: [0,0,0,0] };
+      const order = [3, 2, 1, 0]; // largest first for tighter pruning
       let best = { cost: Infinity, counts: [0,0,0,0] };
-
       function recurse(orderIdx, counts, minsCovered, cost) {
         if (cost >= best.cost) return;
         if (minsCovered >= totalMins) {
@@ -671,138 +539,205 @@
         counts[i] = 0;
       }
       recurse(0, [0,0,0,0], 0, 0);
-
-      const breakdown = best.counts
+      return best;
+    }
+    function passBreakdown(counts) {
+      return counts
         .map((n, i) => n > 0 ? `${n}×${BUNDLES[i].mins}m` : null)
-        .filter(Boolean);
-      return { cost: best.cost, breakdown };
+        .filter(Boolean)
+        .join(' + ') || '—';
     }
 
     const monthly = (function() {
       const svg = d3.select('#chart-monthly');
-      const W = 720, H = 360;
-      const M = { top: 16, right: 18, bottom: 60, left: 56 };
+      const W = 720, H = 380;
+      const M = { top: 24, right: 90, bottom: 48, left: 56 };
       const iw = W - M.left - M.right;
       const ih = H - M.top - M.bottom;
 
       const g = svg.append('g').attr('transform', `translate(${M.left},${M.top})`);
 
       const PLANS = [
-        { id: 'payg',  label: 'PAYG',          color: COLORS.payg },
-        { id: 'prime', label: 'LimePrime',     color: COLORS.prime },
-        { id: 'pass',  label: 'LimePass',      color: COLORS.b200 },
+        { id: 'payg',  label: 'PAYG',      color: COLORS.payg,  sub: '£1 unlock + 31p/min' },
+        { id: 'prime', label: 'LimePrime', color: COLORS.prime, sub: '£6.99/mo + ride tiers' },
+        { id: 'pass',  label: 'LimePass',  color: COLORS.b200,  sub: 'Best bundle combo' },
       ];
 
-      const x = d3.scaleBand().domain(PLANS.map(p => p.id)).range([0, iw]).padding(0.35);
-      const y = d3.scaleLinear().domain([0, 100]).range([ih, 0]);
+      const x = d3.scaleLinear().domain([0, MAX_RPM]).range([0, iw]);
+      const y = d3.scaleLinear().range([ih, 0]);
 
       const gridG = g.append('g').attr('class', 'grid');
       const xAxisG = g.append('g').attr('class', 'axis').attr('transform', `translate(0,${ih})`);
       const yAxisG = g.append('g').attr('class', 'axis');
 
-      xAxisG.call(d3.axisBottom(x).tickFormat(id => PLANS.find(p => p.id === id).label));
+      xAxisG.call(d3.axisBottom(x).ticks(6).tickFormat(d => Math.round(d)));
 
-      const bars = g.selectAll('rect.bar')
+      g.append('text').attr('x', iw).attr('y', ih + 36).attr('text-anchor', 'end')
+        .attr('class', 'series-label').attr('fill', 'var(--text-faint)').text('rides per month');
+      g.append('text').attr('x', 0).attr('y', -10).attr('text-anchor', 'start')
+        .attr('class', 'series-label').attr('fill', 'var(--text-faint)').text('£ / month');
+
+      const lineFn = d3.line().x(d => x(d.r)).y(d => y(d.c));
+
+      const paths = {};
+      const endLabels = {};
+      const dots = {};
+      PLANS.forEach(p => {
+        paths[p.id] = g.append('path')
+          .attr('class', 'series-line')
+          .attr('stroke', p.color)
+          .attr('opacity', 0.9)
+          .attr('fill', 'none');
+        endLabels[p.id] = g.append('text')
+          .attr('class', 'series-label')
+          .attr('fill', p.color)
+          .attr('opacity', 0.9);
+      });
+
+      const cursor = g.append('line').attr('class', 'cursor-line').attr('y1', 0).attr('y2', ih);
+      PLANS.forEach(p => {
+        dots[p.id] = g.append('circle')
+          .attr('class', 'series-dot')
+          .attr('r', 4.5)
+          .attr('fill', p.color);
+      });
+
+      // Legend
+      const legend = d3.select('#legend-monthly');
+      legend.selectAll('span.entry')
         .data(PLANS)
         .enter()
-        .append('rect')
-        .attr('class', 'bar')
-        .attr('x', d => x(d.id))
-        .attr('width', x.bandwidth())
-        .attr('rx', 6)
-        .attr('fill', d => d.color)
-        .attr('opacity', 0.85);
+        .append('span')
+        .attr('class', 'entry')
+        .html(d => `<span class="swatch" style="background:${d.color}"></span>${d.label}`);
 
-      const barLabels = g.selectAll('text.bar-label')
-        .data(PLANS)
-        .enter()
-        .append('text')
-        .attr('class', 'series-label')
-        .attr('text-anchor', 'middle')
-        .attr('x', d => x(d.id) + x.bandwidth() / 2)
-        .attr('fill', 'var(--text)');
+      // Results table skeleton
+      const tbody = d3.select('#results-monthly tbody');
+      const rows = tbody.selectAll('tr').data(PLANS).enter().append('tr');
+      rows.append('td').attr('class', 'name')
+        .html(d => `<span class="swatch" style="background:${d.color}"></span><span class="name">${d.label}</span><span class="sub" id="sub-${d.id}">${d.sub}</span>`);
+      rows.append('td').attr('class', 'cost').attr('id', d => 'cost-' + d.id);
 
-      const subLabels = g.selectAll('text.sub-label')
-        .data(PLANS)
-        .enter()
-        .append('text')
-        .attr('text-anchor', 'middle')
-        .attr('x', d => x(d.id) + x.bandwidth() / 2)
-        .attr('y', ih + 36)
-        .attr('fill', 'var(--text-faint)')
-        .attr('font-size', 11)
-        .attr('font-family', 'inherit');
+      // Pre-compute lines on avg change
+      const SAMPLES = d3.range(0, MAX_RPM + 1, 1);
+      let lines = null;
 
-      function update(rpw, avg) {
-        const rides = ridesPerMonth(rpw);
-        const totalMins = totalMinsPerMonth(rpw, avg);
+      function computeLines(avg) {
+        const payg  = SAMPLES.map(r => ({ r, c: paygMonthlyRides(r, avg) }));
+        const prime = SAMPLES.map(r => ({ r, c: primeMonthlyRides(r, avg) }));
+        const pass  = SAMPLES.map(r => ({ r, c: passByMins(r * avg).cost }));
+        return { payg, prime, pass };
+      }
 
-        const cPayg  = paygMonthly(rpw, avg);
-        const cPrime = primeMonthly(rpw, avg);
-        const pass   = passMonthly(rpw, avg);
+      function rerenderLines(avg) {
+        lines = computeLines(avg);
+
+        const allCosts = PLANS.flatMap(p => lines[p.id].map(d => d.c));
+        const maxCost = Math.max(...allCosts, 10);
+        y.domain([0, maxCost * 1.05]).nice();
+
+        gridG.call(d3.axisLeft(y).tickSize(-iw).tickFormat(''));
+        yAxisG.call(d3.axisLeft(y).ticks(6).tickFormat(d => '£' + d));
+
+        // Place end labels with simple anti-overlap (sort by y, push)
+        const endPoints = PLANS.map(p => {
+          const last = lines[p.id][lines[p.id].length - 1];
+          return { p, x: x(last.r), y: y(last.c) };
+        }).sort((a, b) => a.y - b.y);
+        let prevY = -Infinity;
+        const minGap = 14;
+        endPoints.forEach(ep => {
+          let yPos = ep.y;
+          if (yPos < prevY + minGap) yPos = prevY + minGap;
+          prevY = yPos;
+          endLabels[ep.p.id]
+            .attr('x', ep.x + 6)
+            .attr('y', yPos + 4)
+            .text(ep.p.label);
+        });
+
+        PLANS.forEach(p => {
+          paths[p.id].datum(lines[p.id]).attr('d', lineFn);
+        });
+      }
+
+      function updateCursor(rpw, avg) {
+        const rides = rpw * WEEKS_PER_MONTH;
+        const totalMins = rides * avg;
+        cursor.attr('x1', x(rides)).attr('x2', x(rides));
+
+        const cPayg  = paygMonthlyRides(rides, avg);
+        const cPrime = primeMonthlyRides(rides, avg);
+        const passResult = passByMins(totalMins);
+        const cPass  = passResult.cost;
 
         const data = [
-          { id: 'payg',  cost: cPayg,    label: '£' + cPayg.toFixed(2),  sub: rides.toFixed(0) + ' rides' },
-          { id: 'prime', cost: cPrime,   label: '£' + cPrime.toFixed(2), sub: '£6.99 sub + rides' },
-          { id: 'pass',  cost: pass.cost, label: '£' + pass.cost.toFixed(2), sub: pass.breakdown.length ? pass.breakdown.join(' + ') : 'no rides' },
+          { id: 'payg',  cost: cPayg,  sub: `${rides.toFixed(0)} rides · ${totalMins.toFixed(0)} min` },
+          { id: 'prime', cost: cPrime, sub: '£6.99 sub + rides' },
+          { id: 'pass',  cost: cPass,  sub: passBreakdown(passResult.counts) },
         ];
 
-        const maxC = Math.max(...data.map(d => d.cost), 10);
-        y.domain([0, maxC * 1.15]).nice();
+        data.forEach(d => {
+          dots[d.id].attr('cx', x(rides)).attr('cy', y(d.cost));
+        });
 
-        gridG.transition().duration(180)
-          .call(d3.axisLeft(y).ticks(5).tickSize(-iw).tickFormat(''));
-        yAxisG.transition().duration(180)
-          .call(d3.axisLeft(y).ticks(5).tickFormat(d => '£' + d));
+        const minCost = Math.min(...data.map(d => d.cost));
 
-        bars.data(data)
-          .transition().duration(220)
-          .attr('y', d => y(d.cost))
-          .attr('height', d => ih - y(d.cost));
+        data.forEach(d => {
+          d3.select('#cost-' + d.id).text('£' + d.cost.toFixed(2))
+            .classed('win', Math.abs(d.cost - minCost) < 0.005 && rides > 0)
+            .classed('bad', d.cost > minCost * 1.6);
+          d3.select('#sub-' + d.id).text(d.sub);
+        });
 
-        barLabels.data(data)
-          .transition().duration(220)
-          .attr('y', d => y(d.cost) - 8)
-          .text(d => d.label);
+        // Winner banner
+        const winners = data.filter(d => Math.abs(d.cost - minCost) < 0.005);
+        const wName = winners
+          .map(w => PLANS.find(p => p.id === w.id).label)
+          .join(' / ');
 
-        subLabels.data(data)
-          .text(d => d.sub);
+        const altsSorted = data
+          .filter(d => Math.abs(d.cost - minCost) >= 0.005)
+          .sort((a, b) => a.cost - b.cost);
 
-        // Winner
-        const min = Math.min(...data.map(d => d.cost));
-        const winners = data.filter(d => Math.abs(d.cost - min) < 0.005);
-        const wName = winners.map(w => PLANS.find(p => p.id === w.id).label).join(' / ');
-
-        bars.attr('opacity', d => Math.abs(d.cost - min) < 0.005 ? 1 : 0.5);
-
-        const sortedAlts = data
-          .filter(d => Math.abs(d.cost - min) >= 0.005)
-          .sort((a,b) => a.cost - b.cost);
-
-        let summary = `<b>${wName}</b> wins at <b>£${min.toFixed(2)}/month</b>`;
-        if (sortedAlts.length) {
-          const next = sortedAlts[0];
-          const nextLabel = PLANS.find(p => p.id === next.id).label;
-          summary += ` — ${(next.cost - min).toFixed(2) === '0.00' ? 'tied with' : 'saving £' + (next.cost - min).toFixed(2) + '/mo over'} ${nextLabel}.`;
+        let summary;
+        if (rides === 0) {
+          summary = `<span style="color: var(--text-faint);">No rides — no cost on any plan.</span>`;
         } else {
-          summary += '.';
+          summary = `<b>${wName}</b> wins at <b>£${minCost.toFixed(2)}/month</b>`;
+          if (altsSorted.length) {
+            const next = altsSorted[0];
+            const nextLabel = PLANS.find(p => p.id === next.id).label;
+            const diff = next.cost - minCost;
+            summary += diff < 0.01
+              ? ` — tied with ${nextLabel}.`
+              : ` — saving <b>£${diff.toFixed(2)}/mo</b> over ${nextLabel}.`;
+          } else {
+            summary += '.';
+          }
+          summary += ` <span style="color: var(--text-faint);">(${rides.toFixed(0)} rides · ${totalMins.toFixed(0)} min total)</span>`;
         }
-        summary += ` <span style="color: var(--text-faint);">(${rides.toFixed(0)} rides · ${totalMins.toFixed(0)} total minutes)</span>`;
         document.getElementById('winner-text').innerHTML = summary;
       }
-      return { update };
+
+      return { rerenderLines, updateCursor };
     })();
 
-    function readMonthly() {
+    let currentAvg = null;
+    function readInputs() {
       const rpw = +document.getElementById('rpw').value;
       const avg = +document.getElementById('avg').value;
       document.getElementById('rpw-val').textContent = rpw;
       document.getElementById('avg-val').textContent = avg;
-      monthly.update(rpw, avg);
+      if (avg !== currentAvg) {
+        monthly.rerenderLines(avg);
+        currentAvg = avg;
+      }
+      monthly.updateCursor(rpw, avg);
     }
-    document.getElementById('rpw').addEventListener('input', readMonthly);
-    document.getElementById('avg').addEventListener('input', readMonthly);
-    readMonthly();
+    document.getElementById('rpw').addEventListener('input', readInputs);
+    document.getElementById('avg').addEventListener('input', readInputs);
+    readInputs();
   })();
   </script>
 </body>
