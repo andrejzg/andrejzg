@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Andrej's Home Page</title>
+  <style>
+    body {
+      background-color: #000080;
+      color: #00ff00;
+      font-family: "Comic Sans MS", "Courier New", monospace;
+      text-align: center;
+      margin: 0;
+      padding: 20px;
+    }
+    h1 {
+      color: #ffff00;
+      font-size: 48px;
+      text-shadow: 2px 2px #ff0000;
+    }
+    hr {
+      border: none;
+      height: 4px;
+      background: repeating-linear-gradient(90deg, #ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000);
+    }
+    a {
+      color: #00ffff;
+    }
+    a:visited {
+      color: #ff00ff;
+    }
+    .marquee {
+      color: #ff0000;
+      font-size: 20px;
+      font-weight: bold;
+      overflow: hidden;
+      white-space: nowrap;
+    }
+    .marquee span {
+      display: inline-block;
+      animation: marquee 10s linear infinite;
+    }
+    @keyframes marquee {
+      0% { transform: translateX(100vw); }
+      100% { transform: translateX(-100%); }
+    }
+    .blink {
+      animation: blink 1s step-end infinite;
+    }
+    @keyframes blink {
+      50% { opacity: 0; }
+    }
+    .counter {
+      margin-top: 30px;
+      font-size: 14px;
+      color: #cccccc;
+    }
+    .guestbook {
+      margin: 20px auto;
+      border: 3px ridge #c0c0c0;
+      background: #c0c0c0;
+      color: #000000;
+      padding: 10px;
+      width: 400px;
+      font-family: "Times New Roman", serif;
+    }
+    .guestbook h3 {
+      color: #000080;
+      margin-top: 0;
+    }
+    .under-construction {
+      font-size: 24px;
+      margin: 20px;
+    }
+    table {
+      margin: 20px auto;
+      border: 2px solid #00ff00;
+    }
+    td {
+      padding: 8px 16px;
+      border: 1px solid #00ff00;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="marquee"><span>Welcome to my awesome homepage on the World Wide Web!!!</span></div>
+
+  <hr>
+
+  <h1>Andrej's Home Page</h1>
+
+  <p class="blink">*** UNDER CONSTRUCTION ***</p>
+
+  <p class="under-construction">&#128679; &#128679; &#128679;</p>
+
+  <hr>
+
+  <h2 style="color: #ff6600;">About Me</h2>
+  <table>
+    <tr><td>Name</td><td>Andrej</td></tr>
+    <tr><td>Interests</td><td>Computers, The Internet</td></tr>
+    <tr><td>Browser</td><td>Netscape Navigator 4.0</td></tr>
+    <tr><td>Resolution</td><td>800x600</td></tr>
+  </table>
+
+  <hr>
+
+  <h2 style="color: #ff6600;">Cool Links</h2>
+  <p>
+    <a href="https://www.google.com">AltaVista Search Engine</a><br>
+    <a href="https://en.wikipedia.org">Encyclopedia Britannica Online</a><br>
+    <a href="https://news.ycombinator.com">Hacker News</a>
+  </p>
+
+  <hr>
+
+  <div class="guestbook">
+    <h3>Sign My Guestbook!</h3>
+    <p>You are visitor number <b>000042</b></p>
+    <p><i>Last updated: April 4, 2026</i></p>
+  </div>
+
+  <hr>
+
+  <p style="font-size: 12px; color: #808080;">
+    Best viewed in Netscape Navigator at 800x600<br>
+    Made with Notepad<br>
+    &copy; 1997 Andrej. All rights reserved.
+  </p>
+
+</body>
+</html>
