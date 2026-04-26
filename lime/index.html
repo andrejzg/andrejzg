@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0c0f0a">
+  <title>Lime Pricing Explorer · London</title>
+  <script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
+  <style>
+    :root {
+      --bg: #0c0f0a;
+      --bg-card: #141812;
+      --bg-soft: #1b2017;
+      --line: #232a1d;
+      --text: #e8efe2;
+      --text-dim: #8a9483;
+      --text-faint: #5b6354;
+      --lime: #c5ff3d;
+      --lime-soft: #88b32a;
+      --orange: #ff9b3d;
+      --pink: #ff6ba1;
+      --blue: #6ab7ff;
+      --violet: #b18cff;
+      --warn: #ff5a5a;
+      --radius: 14px;
+      --radius-sm: 9px;
+      --shadow: 0 1px 0 rgba(255,255,255,0.04) inset, 0 8px 32px rgba(0,0,0,0.4);
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif;
+      font-feature-settings: "ss01", "cv11";
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+      line-height: 1.5;
+    }
+    body {
+      background:
+        radial-gradient(1200px 600px at 80% -10%, rgba(197,255,61,0.07), transparent 60%),
+        radial-gradient(900px 500px at -10% 30%, rgba(106,183,255,0.05), transparent 60%),
+        var(--bg);
+      min-height: 100vh;
+      padding: 28px 18px 80px;
+    }
+    .wrap {
+      max-width: 920px;
+      margin: 0 auto;
+    }
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 28px;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+    }
+    .brand-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--lime);
+      box-shadow: 0 0 24px var(--lime);
+    }
+    .brand-name { color: var(--text-dim); font-size: 14px; }
+    .brand-name b { color: var(--text); font-weight: 600; }
+    nav a {
+      color: var(--text-dim);
+      text-decoration: none;
+      font-size: 14px;
+      padding: 6px 10px;
+      border-radius: 8px;
+      transition: color 0.15s, background 0.15s;
+    }
+    nav a:hover { color: var(--text); background: var(--bg-soft); }
+
+    h1 {
+      font-size: clamp(34px, 7vw, 56px);
+      line-height: 1.02;
+      letter-spacing: -0.03em;
+      font-weight: 600;
+      margin: 18px 0 10px;
+    }
+    h1 em {
+      font-style: normal;
+      color: var(--lime);
+    }
+    .lede {
+      color: var(--text-dim);
+      font-size: clamp(15px, 2.4vw, 17px);
+      max-width: 60ch;
+      margin: 0 0 28px;
+    }
+
+    .card {
+      background: linear-gradient(180deg, var(--bg-card), var(--bg-card) 60%, #11140e);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 22px;
+      margin: 18px 0;
+      box-shadow: var(--shadow);
+    }
+    .card h2 {
+      font-size: 14px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+      margin: 0 0 14px;
+      font-weight: 600;
+    }
+    .card h3 {
+      font-size: 22px;
+      letter-spacing: -0.02em;
+      margin: 0 0 6px;
+      font-weight: 600;
+    }
+
+    .plans {
+      display: grid;
+      gap: 12px;
+      grid-template-columns: 1fr;
+    }
+    @media (min-width: 640px) { .plans { grid-template-columns: repeat(3, 1fr); } }
+    .plan {
+      background: var(--bg-soft);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+      padding: 14px;
+    }
+    .plan .tag {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 100px;
+      background: rgba(197,255,61,0.12);
+      color: var(--lime);
+      font-size: 11px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+    .plan .price { font-size: 26px; font-weight: 600; letter-spacing: -0.02em; }
+    .plan .price small { font-size: 13px; color: var(--text-dim); font-weight: 400; }
+    .plan ul { margin: 10px 0 0; padding-left: 18px; color: var(--text-dim); font-size: 13px; }
+    .plan li { margin: 3px 0; }
+    .plan li b { color: var(--text); font-weight: 500; }
+
+    /* Controls */
+    .control-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin: 14px 0 6px;
+      flex-wrap: wrap;
+    }
+    .control-row label {
+      font-size: 13px;
+      color: var(--text-dim);
+      flex-shrink: 0;
+    }
+    .stat {
+      font-variant-numeric: tabular-nums;
+      color: var(--text);
+      font-weight: 600;
+    }
+    .stat .unit { color: var(--text-faint); font-weight: 400; margin-left: 2px; font-size: 0.85em; }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 28px;
+      background: transparent;
+      cursor: pointer;
+    }
+    input[type="range"]::-webkit-slider-runnable-track {
+      height: 4px;
+      background: var(--line);
+      border-radius: 999px;
+    }
+    input[type="range"]::-moz-range-track {
+      height: 4px;
+      background: var(--line);
+      border-radius: 999px;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      height: 22px;
+      width: 22px;
+      border-radius: 50%;
+      background: var(--lime);
+      border: 3px solid var(--bg-card);
+      margin-top: -9px;
+      box-shadow: 0 0 0 1px var(--lime), 0 0 18px rgba(197,255,61,0.35);
+    }
+    input[type="range"]::-moz-range-thumb {
+      height: 22px;
+      width: 22px;
+      border-radius: 50%;
+      background: var(--lime);
+      border: 3px solid var(--bg-card);
+      box-shadow: 0 0 0 1px var(--lime), 0 0 18px rgba(197,255,61,0.35);
+    }
+
+    /* Chart */
+    .chart-wrap {
+      width: 100%;
+      position: relative;
+      margin-top: 14px;
+    }
+    svg.chart {
+      display: block;
+      width: 100%;
+      height: auto;
+      overflow: visible;
+      touch-action: none;
+    }
+    .axis path, .axis line {
+      stroke: var(--line);
+      shape-rendering: crispEdges;
+    }
+    .axis text {
+      fill: var(--text-faint);
+      font-size: 11px;
+      font-family: inherit;
+    }
+    .grid line {
+      stroke: var(--line);
+      stroke-dasharray: 2 3;
+      opacity: 0.6;
+    }
+    .grid path { stroke: none; }
+
+    .series-line {
+      fill: none;
+      stroke-width: 2;
+      stroke-linejoin: round;
+      stroke-linecap: round;
+    }
+    .series-dot {
+      stroke-width: 2;
+      stroke: var(--bg-card);
+    }
+    .series-label {
+      font-size: 11px;
+      font-weight: 600;
+      font-family: inherit;
+    }
+    .cursor-line { stroke: var(--text-faint); stroke-dasharray: 3 3; opacity: 0.6; }
+
+    /* Legend & results table */
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 16px;
+      margin-top: 12px;
+      font-size: 12px;
+      color: var(--text-dim);
+    }
+    .legend .swatch {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 3px;
+      margin-right: 6px;
+      vertical-align: middle;
+    }
+
+    .results {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 16px;
+      font-size: 14px;
+    }
+    .results th, .results td {
+      text-align: left;
+      padding: 10px 8px;
+      border-bottom: 1px solid var(--line);
+      font-variant-numeric: tabular-nums;
+    }
+    .results th {
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+      font-weight: 500;
+    }
+    .results tr:last-child td { border-bottom: none; }
+    .results td.cost { font-weight: 600; text-align: right; }
+    .results td.cost.win { color: var(--lime); }
+    .results td.cost.bad { color: var(--text-faint); }
+    .results .swatch { width: 8px; height: 8px; border-radius: 2px; display: inline-block; margin-right: 8px; vertical-align: middle; }
+    .results .name { color: var(--text); }
+    .results .sub { color: var(--text-faint); font-size: 12px; margin-left: 14px; display: block; }
+
+    /* Monthly calculator */
+    .calc-grid {
+      display: grid;
+      gap: 14px;
+      grid-template-columns: 1fr;
+    }
+    @media (min-width: 640px) { .calc-grid { grid-template-columns: 1fr 1fr; } }
+    .field {
+      background: var(--bg-soft);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+      padding: 12px 14px;
+    }
+    .field-label {
+      font-size: 12px;
+      letter-spacing: 0.04em;
+      color: var(--text-faint);
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+    .field-value {
+      font-size: 22px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      font-variant-numeric: tabular-nums;
+      margin-bottom: 4px;
+    }
+    .field-value .unit { color: var(--text-dim); font-size: 14px; font-weight: 400; margin-left: 2px; }
+
+    .winner {
+      margin-top: 16px;
+      padding: 14px;
+      border-radius: var(--radius-sm);
+      background: linear-gradient(135deg, rgba(197,255,61,0.10), rgba(197,255,61,0.02));
+      border: 1px solid rgba(197,255,61,0.18);
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+    }
+    .winner .arrow { color: var(--lime); font-size: 22px; line-height: 1; flex-shrink: 0; }
+    .winner b { color: var(--lime); }
+
+    .notes {
+      font-size: 12px;
+      color: var(--text-faint);
+      margin-top: 16px;
+      line-height: 1.6;
+    }
+    .notes a { color: var(--text-dim); }
+    footer {
+      margin-top: 40px;
+      color: var(--text-faint);
+      font-size: 12px;
+      text-align: center;
+    }
+    footer a { color: var(--text-dim); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="brand">
+        <span class="brand-dot"></span>
+        <span class="brand-name"><b>andrejzg</b> / lime</span>
+      </div>
+      <nav><a href="/">← home</a></nav>
+    </header>
+
+    <h1>How much does a <em>Lime</em> ride actually cost in London?</h1>
+    <p class="lede">An interactive look at the four ways to pay — PAYG, LimePrime, and the four LimePass minute bundles — and when each one wins.</p>
+
+    <!-- Plans overview -->
+    <section class="card">
+      <h2>The four pricing schemes</h2>
+      <div class="plans">
+        <div class="plan">
+          <span class="tag" style="color: var(--orange); background: rgba(255,155,61,0.12);">Pay as you go</span>
+          <div class="price">£1<small> + 31p/min</small></div>
+          <ul>
+            <li>£1 unlock fee per ride</li>
+            <li><b>£1 flat</b> if ride &lt; 5 min</li>
+            <li>No commitment</li>
+          </ul>
+        </div>
+        <div class="plan">
+          <span class="tag">LimePrime</span>
+          <div class="price">£6.99<small>/month</small></div>
+          <ul>
+            <li>Free unlocks</li>
+            <li><b>£1</b> rides &lt; 5 min</li>
+            <li><b>£1.70</b> flat up to 20 min</li>
+            <li>+£0.16/min after 20 min</li>
+          </ul>
+        </div>
+        <div class="plan">
+          <span class="tag" style="color: var(--blue); background: rgba(106,183,255,0.12);">LimePass bundles</span>
+          <div class="price">From £3.99</div>
+          <ul>
+            <li>30 min · £3.99 · use in 1d</li>
+            <li>60 min · £6.99 · use in 3d</li>
+            <li>200 min · £18.99 · use in 7d</li>
+            <li>400 min · £36.99 · use in 30d</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- Single ride explorer -->
+    <section class="card">
+      <h2>Single ride · cost vs duration</h2>
+      <h3>How much for a <span id="duration-stat" class="stat">10<span class="unit">min</span></span> ride?</h3>
+
+      <div class="control-row">
+        <label for="duration">Duration</label>
+        <input id="duration" type="range" min="1" max="60" value="10" step="1" />
+      </div>
+
+      <div class="chart-wrap">
+        <svg class="chart" id="chart-single" viewBox="0 0 720 340" preserveAspectRatio="xMidYMid meet" aria-label="Cost vs ride duration"></svg>
+      </div>
+
+      <div class="legend" id="legend-single"></div>
+
+      <table class="results" id="results-single">
+        <thead>
+          <tr><th>Plan</th><th style="text-align:right;">This ride</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+
+      <p class="notes">
+        LimePass costs are shown as the <em>amortised</em> per-ride cost assuming you fully use the bundle within its expiry window. If you don't, the effective cost is higher. LimePrime costs exclude the £6.99 monthly fee — that's amortised in the next chart.
+      </p>
+    </section>
+
+    <!-- Monthly calculator -->
+    <section class="card">
+      <h2>Monthly cost · how often do you ride?</h2>
+      <h3>Pick your routine, see the cheapest plan.</h3>
+
+      <div class="calc-grid">
+        <div class="field">
+          <div class="field-label">Rides per week</div>
+          <div class="field-value"><span id="rpw-val">5</span><span class="unit">/week</span></div>
+          <input id="rpw" type="range" min="1" max="40" value="5" step="1" />
+        </div>
+        <div class="field">
+          <div class="field-label">Average ride length</div>
+          <div class="field-value"><span id="avg-val">12</span><span class="unit">min</span></div>
+          <input id="avg" type="range" min="1" max="45" value="12" step="1" />
+        </div>
+      </div>
+
+      <div class="chart-wrap">
+        <svg class="chart" id="chart-monthly" viewBox="0 0 720 360" preserveAspectRatio="xMidYMid meet" aria-label="Monthly cost by plan"></svg>
+      </div>
+
+      <div class="winner" id="winner">
+        <span class="arrow">→</span>
+        <div id="winner-text"></div>
+      </div>
+
+      <p class="notes">
+        Assumes 4.33 weeks/month. LimePass costs use the smallest combination of bundles that covers your monthly minutes; unused minutes within a bundle expire (so longer bundles need consistent use). All numbers based on London rates after the November 2025 hike (PAYG: £1 unlock + 31p/min).
+      </p>
+    </section>
+
+    <footer>
+      Data sources: Lime in-app screens · <a href="https://www.cityam.com/lime-squeezes-london-riders-with-quiet-price-hike/" target="_blank" rel="noopener">CityAM</a> · <a href="https://www.tubenotifications.co.uk/insights/london-lime-bikes" target="_blank" rel="noopener">Tube Notifications</a>. Pricing changes — verify in-app before riding.
+    </footer>
+  </div>
+
+  <script>
+  (function() {
+    'use strict';
+
+    // --- Pricing models ---------------------------------------------
+    const PAYG = { unlock: 1.00, perMin: 0.31, shortFlat: 1.00, shortLimit: 5 };
+    const PRIME = { sub: 6.99, shortFlat: 1.00, shortLimit: 5, midFlat: 1.70, midLimit: 20, postPerMin: 0.16 };
+    const BUNDLES = [
+      { mins: 30,  price: 3.99,  validDays: 1  },
+      { mins: 60,  price: 6.99,  validDays: 3  },
+      { mins: 200, price: 18.99, validDays: 7  },
+      { mins: 400, price: 36.99, validDays: 30 },
+    ];
+
+    function paygCost(t) {
+      if (t <= 0) return 0;
+      if (t < PAYG.shortLimit) return PAYG.shortFlat;
+      return PAYG.unlock + PAYG.perMin * t;
+    }
+    function primeRideCost(t) {
+      if (t <= 0) return 0;
+      if (t < PRIME.shortLimit) return PRIME.shortFlat;
+      if (t <= PRIME.midLimit) return PRIME.midFlat;
+      return PRIME.midFlat + PRIME.postPerMin * (t - PRIME.midLimit);
+    }
+    function bundlePerMin(b) { return b.price / b.mins; }
+    function bundleRideCost(b, t) { return Math.max(0, t) * bundlePerMin(b); }
+
+    // --- Series colours --------------------------------------------
+    const COLORS = {
+      payg:    '#ff9b3d',
+      prime:   '#c5ff3d',
+      b30:     '#ff6ba1',
+      b60:     '#b18cff',
+      b200:    '#6ab7ff',
+      b400:    '#5be3c4',
+    };
+    const SERIES = [
+      { id: 'payg',  label: 'PAYG',           color: COLORS.payg,  fn: paygCost,                       sub: '£1 unlock + 31p/min' },
+      { id: 'prime', label: 'LimePrime',      color: COLORS.prime, fn: primeRideCost,                  sub: 'Tiered, ride only' },
+      { id: 'b30',   label: 'Pass · 30min',   color: COLORS.b30,   fn: t => bundleRideCost(BUNDLES[0], t), sub: '£3.99 / 30min · 13.3p/min' },
+      { id: 'b60',   label: 'Pass · 60min',   color: COLORS.b60,   fn: t => bundleRideCost(BUNDLES[1], t), sub: '£6.99 / 60min · 11.7p/min' },
+      { id: 'b200',  label: 'Pass · 200min',  color: COLORS.b200,  fn: t => bundleRideCost(BUNDLES[2], t), sub: '£18.99 / 200min · 9.5p/min' },
+      { id: 'b400',  label: 'Pass · 400min',  color: COLORS.b400,  fn: t => bundleRideCost(BUNDLES[3], t), sub: '£36.99 / 400min · 9.2p/min' },
+    ];
+
+    // ============================================================
+    // CHART 1 — single ride
+    // ============================================================
+    const single = (function() {
+      const svg = d3.select('#chart-single');
+      const W = 720, H = 340;
+      const M = { top: 16, right: 18, bottom: 36, left: 44 };
+      const iw = W - M.left - M.right;
+      const ih = H - M.top - M.bottom;
+
+      const g = svg.append('g').attr('transform', `translate(${M.left},${M.top})`);
+
+      const x = d3.scaleLinear().domain([0, 60]).range([0, iw]);
+      const y = d3.scaleLinear().domain([0, 22]).nice().range([ih, 0]);
+
+      // Grid
+      g.append('g').attr('class', 'grid')
+        .call(d3.axisLeft(y).tickSize(-iw).tickFormat(''));
+
+      // Axes
+      g.append('g').attr('class', 'axis')
+        .attr('transform', `translate(0,${ih})`)
+        .call(d3.axisBottom(x).ticks(6).tickFormat(d => d + 'm'));
+      g.append('g').attr('class', 'axis')
+        .call(d3.axisLeft(y).ticks(5).tickFormat(d => '£' + d));
+
+      // Axis titles
+      g.append('text').attr('x', iw).attr('y', ih + 30).attr('text-anchor', 'end')
+        .attr('class', 'series-label').attr('fill', 'var(--text-faint)').text('ride duration');
+      g.append('text').attr('x', 0).attr('y', -4).attr('text-anchor', 'start')
+        .attr('class', 'series-label').attr('fill', 'var(--text-faint)').text('£ cost');
+
+      const line = d3.line()
+        .x(d => x(d.t))
+        .y(d => y(d.c))
+        .curve(d3.curveLinear);
+
+      const minutes = d3.range(0, 60.5, 0.5);
+      SERIES.forEach(s => {
+        const data = minutes.map(t => ({ t, c: s.fn(t) }));
+        g.append('path')
+          .datum(data)
+          .attr('class', 'series-line')
+          .attr('stroke', s.color)
+          .attr('opacity', 0.85)
+          .attr('d', line);
+
+        // End label
+        const last = data[data.length - 1];
+        g.append('text')
+          .attr('class', 'series-label')
+          .attr('x', x(last.t) + 4)
+          .attr('y', y(last.c) + 3)
+          .attr('fill', s.color)
+          .attr('opacity', 0.85)
+          .text(s.label);
+      });
+
+      // Cursor + dots
+      const cursor = g.append('line').attr('class', 'cursor-line').attr('y1', 0).attr('y2', ih);
+      const dotsG = g.append('g');
+      const dots = SERIES.map(s => dotsG.append('circle')
+        .attr('class', 'series-dot')
+        .attr('r', 4)
+        .attr('fill', s.color));
+
+      // Legend
+      const legend = d3.select('#legend-single');
+      legend.selectAll('span.entry')
+        .data(SERIES)
+        .enter()
+        .append('span')
+        .attr('class', 'entry')
+        .html(d => `<span class="swatch" style="background:${d.color}"></span>${d.label}`);
+
+      // Results table body
+      const tbody = d3.select('#results-single tbody');
+      const rows = tbody.selectAll('tr').data(SERIES).enter().append('tr');
+      rows.append('td').attr('class', 'name')
+        .html(d => `<span class="swatch" style="background:${d.color}"></span><span class="name">${d.label}</span><span class="sub">${d.sub}</span>`);
+      rows.append('td').attr('class', 'cost').attr('id', d => 'cost-' + d.id);
+
+      function update(t) {
+        cursor.attr('x1', x(t)).attr('x2', x(t));
+        const costs = SERIES.map(s => ({ s, c: s.fn(t) }));
+        const minCost = d3.min(costs, d => d.c);
+        costs.forEach((d, i) => {
+          dots[i].attr('cx', x(t)).attr('cy', y(d.c));
+        });
+        d3.select('#duration-stat').html(t + '<span class="unit">min</span>');
+        costs.forEach(d => {
+          const cell = d3.select('#cost-' + d.s.id);
+          cell.text('£' + d.c.toFixed(2));
+          cell.classed('win', Math.abs(d.c - minCost) < 0.001 && t > 0);
+          cell.classed('bad', d.c > minCost * 1.8);
+        });
+      }
+      return { update };
+    })();
+
+    document.getElementById('duration').addEventListener('input', e => {
+      single.update(+e.target.value);
+    });
+    single.update(10);
+
+    // ============================================================
+    // CHART 2 — monthly cost (bar chart with break-even info)
+    // ============================================================
+    const WEEKS_PER_MONTH = 4.33;
+
+    function ridesPerMonth(rpw) { return rpw * WEEKS_PER_MONTH; }
+    function totalMinsPerMonth(rpw, avg) { return ridesPerMonth(rpw) * avg; }
+
+    function paygMonthly(rpw, avg) {
+      return ridesPerMonth(rpw) * paygCost(avg);
+    }
+    function primeMonthly(rpw, avg) {
+      return PRIME.sub + ridesPerMonth(rpw) * primeRideCost(avg);
+    }
+    // For LimePass, find the cheapest combination of bundles that
+    // covers the monthly minutes. Unused bundle minutes are wasted.
+    // Greedy with backtracking-lite: try each bundle as the "primary"
+    // and fill the remainder with the cheapest per-minute bundle.
+    function passMonthly(rpw, avg) {
+      const totalMins = totalMinsPerMonth(rpw, avg);
+      if (totalMins <= 0) return { cost: 0, breakdown: [] };
+
+      // Enumerate bundle counts with branch-and-bound pruning.
+      // Process bundles largest -> smallest so cheap-per-min options
+      // form an early upper bound, then prune branches that can't beat it.
+      const order = [3, 2, 1, 0]; // indices of BUNDLES, largest first
+      let best = { cost: Infinity, counts: [0,0,0,0] };
+
+      function recurse(orderIdx, counts, minsCovered, cost) {
+        if (cost >= best.cost) return;
+        if (minsCovered >= totalMins) {
+          best = { cost, counts: counts.slice() };
+          return;
+        }
+        if (orderIdx >= order.length) return;
+        const i = order[orderIdx];
+        const b = BUNDLES[i];
+        const remaining = totalMins - minsCovered;
+        const maxN = Math.ceil(remaining / b.mins) + 1;
+        for (let n = maxN; n >= 0; n--) {
+          counts[i] = n;
+          recurse(orderIdx + 1, counts, minsCovered + n * b.mins, cost + n * b.price);
+        }
+        counts[i] = 0;
+      }
+      recurse(0, [0,0,0,0], 0, 0);
+
+      const breakdown = best.counts
+        .map((n, i) => n > 0 ? `${n}×${BUNDLES[i].mins}m` : null)
+        .filter(Boolean);
+      return { cost: best.cost, breakdown };
+    }
+
+    const monthly = (function() {
+      const svg = d3.select('#chart-monthly');
+      const W = 720, H = 360;
+      const M = { top: 16, right: 18, bottom: 60, left: 56 };
+      const iw = W - M.left - M.right;
+      const ih = H - M.top - M.bottom;
+
+      const g = svg.append('g').attr('transform', `translate(${M.left},${M.top})`);
+
+      const PLANS = [
+        { id: 'payg',  label: 'PAYG',          color: COLORS.payg },
+        { id: 'prime', label: 'LimePrime',     color: COLORS.prime },
+        { id: 'pass',  label: 'LimePass',      color: COLORS.b200 },
+      ];
+
+      const x = d3.scaleBand().domain(PLANS.map(p => p.id)).range([0, iw]).padding(0.35);
+      const y = d3.scaleLinear().domain([0, 100]).range([ih, 0]);
+
+      const gridG = g.append('g').attr('class', 'grid');
+      const xAxisG = g.append('g').attr('class', 'axis').attr('transform', `translate(0,${ih})`);
+      const yAxisG = g.append('g').attr('class', 'axis');
+
+      xAxisG.call(d3.axisBottom(x).tickFormat(id => PLANS.find(p => p.id === id).label));
+
+      const bars = g.selectAll('rect.bar')
+        .data(PLANS)
+        .enter()
+        .append('rect')
+        .attr('class', 'bar')
+        .attr('x', d => x(d.id))
+        .attr('width', x.bandwidth())
+        .attr('rx', 6)
+        .attr('fill', d => d.color)
+        .attr('opacity', 0.85);
+
+      const barLabels = g.selectAll('text.bar-label')
+        .data(PLANS)
+        .enter()
+        .append('text')
+        .attr('class', 'series-label')
+        .attr('text-anchor', 'middle')
+        .attr('x', d => x(d.id) + x.bandwidth() / 2)
+        .attr('fill', 'var(--text)');
+
+      const subLabels = g.selectAll('text.sub-label')
+        .data(PLANS)
+        .enter()
+        .append('text')
+        .attr('text-anchor', 'middle')
+        .attr('x', d => x(d.id) + x.bandwidth() / 2)
+        .attr('y', ih + 36)
+        .attr('fill', 'var(--text-faint)')
+        .attr('font-size', 11)
+        .attr('font-family', 'inherit');
+
+      function update(rpw, avg) {
+        const rides = ridesPerMonth(rpw);
+        const totalMins = totalMinsPerMonth(rpw, avg);
+
+        const cPayg  = paygMonthly(rpw, avg);
+        const cPrime = primeMonthly(rpw, avg);
+        const pass   = passMonthly(rpw, avg);
+
+        const data = [
+          { id: 'payg',  cost: cPayg,    label: '£' + cPayg.toFixed(2),  sub: rides.toFixed(0) + ' rides' },
+          { id: 'prime', cost: cPrime,   label: '£' + cPrime.toFixed(2), sub: '£6.99 sub + rides' },
+          { id: 'pass',  cost: pass.cost, label: '£' + pass.cost.toFixed(2), sub: pass.breakdown.length ? pass.breakdown.join(' + ') : 'no rides' },
+        ];
+
+        const maxC = Math.max(...data.map(d => d.cost), 10);
+        y.domain([0, maxC * 1.15]).nice();
+
+        gridG.transition().duration(180)
+          .call(d3.axisLeft(y).ticks(5).tickSize(-iw).tickFormat(''));
+        yAxisG.transition().duration(180)
+          .call(d3.axisLeft(y).ticks(5).tickFormat(d => '£' + d));
+
+        bars.data(data)
+          .transition().duration(220)
+          .attr('y', d => y(d.cost))
+          .attr('height', d => ih - y(d.cost));
+
+        barLabels.data(data)
+          .transition().duration(220)
+          .attr('y', d => y(d.cost) - 8)
+          .text(d => d.label);
+
+        subLabels.data(data)
+          .text(d => d.sub);
+
+        // Winner
+        const min = Math.min(...data.map(d => d.cost));
+        const winners = data.filter(d => Math.abs(d.cost - min) < 0.005);
+        const wName = winners.map(w => PLANS.find(p => p.id === w.id).label).join(' / ');
+
+        bars.attr('opacity', d => Math.abs(d.cost - min) < 0.005 ? 1 : 0.5);
+
+        const sortedAlts = data
+          .filter(d => Math.abs(d.cost - min) >= 0.005)
+          .sort((a,b) => a.cost - b.cost);
+
+        let summary = `<b>${wName}</b> wins at <b>£${min.toFixed(2)}/month</b>`;
+        if (sortedAlts.length) {
+          const next = sortedAlts[0];
+          const nextLabel = PLANS.find(p => p.id === next.id).label;
+          summary += ` — ${(next.cost - min).toFixed(2) === '0.00' ? 'tied with' : 'saving £' + (next.cost - min).toFixed(2) + '/mo over'} ${nextLabel}.`;
+        } else {
+          summary += '.';
+        }
+        summary += ` <span style="color: var(--text-faint);">(${rides.toFixed(0)} rides · ${totalMins.toFixed(0)} total minutes)</span>`;
+        document.getElementById('winner-text').innerHTML = summary;
+      }
+      return { update };
+    })();
+
+    function readMonthly() {
+      const rpw = +document.getElementById('rpw').value;
+      const avg = +document.getElementById('avg').value;
+      document.getElementById('rpw-val').textContent = rpw;
+      document.getElementById('avg-val').textContent = avg;
+      monthly.update(rpw, avg);
+    }
+    document.getElementById('rpw').addEventListener('input', readMonthly);
+    document.getElementById('avg').addEventListener('input', readMonthly);
+    readMonthly();
+  })();
+  </script>
+</body>
+</html>
