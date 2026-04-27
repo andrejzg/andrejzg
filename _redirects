@@ -4,5 +4,10 @@
 #   /azg<n>      Dijkstra-style (also accepts azg00n)
 
 /1        /lime  301
+/01       /lime  301
+/001      /lime  301
+/0001     /lime  301
 /azg1     /lime  301
+/azg01    /lime  301
 /azg001   /lime  301
+/azg0001  /lime  301
