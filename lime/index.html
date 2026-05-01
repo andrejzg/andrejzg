@@ -359,6 +359,51 @@
       line-height: 1.6;
     }
     .notes a { color: var(--text-dim); }
+
+    /* Bundle tabs */
+    .bundle-tabs {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px;
+      margin-bottom: 14px;
+    }
+    .bundle-tab {
+      background: var(--bg-soft);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+      padding: 10px 8px;
+      font-family: inherit;
+      cursor: pointer;
+      text-align: center;
+      transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+      color: var(--text-dim);
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .bundle-tab:hover { background: #fff; }
+    .bundle-tab .bt-top {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text);
+      letter-spacing: -0.01em;
+    }
+    .bundle-tab .bt-bot {
+      font-size: 11px;
+      color: var(--text-faint);
+      font-variant-numeric: tabular-nums;
+    }
+    .bundle-tab.active {
+      background: #fff;
+      border-color: var(--bt-color, var(--text-dim));
+      box-shadow: inset 0 -3px 0 var(--bt-color, var(--text-dim));
+    }
+    .bundle-tab.active .bt-top { color: var(--bt-color, var(--text)); }
+    @media (max-width: 480px) {
+      .bundle-tab { padding: 8px 4px; }
+      .bundle-tab .bt-bot { font-size: 10px; }
+    }
     footer {
       margin-top: 40px;
       color: var(--text-faint);
@@ -420,7 +465,9 @@
     <!-- Monthly cost vs usage -->
     <section class="card">
       <h2>Your monthly cost · vs how much you ride</h2>
-      <h3>Where do the plans cross over?</h3>
+      <h3>Pick a LimePass bundle, see when it beats PAYG and LimePrime.</h3>
+
+      <div class="bundle-tabs" role="tablist" aria-label="LimePass bundle"></div>
 
       <div class="calc-grid">
         <div class="field">
@@ -454,7 +501,7 @@
       </div>
 
       <p class="notes">
-        LimePass uses the cheapest combination of bundles that covers your monthly minutes — its line is stepped because you can only buy whole bundles, and any unused minutes expire. Numbers reflect London PAYG rates after the November 2025 hike (£1 unlock + 31p/min, with a £1 flat for rides under 5 min).
+        Each tab models <em>one</em> LimePass bundle of that duration: flat at the bundle price up to its included minutes, then PAYG (£1 unlock + 31p/min, with a £1 flat for rides under 5 min) for any extra rides. Any minutes not used inside the bundle expire. Sub-monthly bundles (1D / 3D / 7D) get expensive quickly past their cap because realistically you'd buy another — switch tabs to compare. London PAYG rates as of the November 2025 hike.
       </p>
     </section>
 
@@ -491,6 +538,21 @@
     function bundlePerMin(b) { return b.price / b.mins; }
     function bundleRideCost(b, t) { return Math.max(0, t) * bundlePerMin(b); }
 
+    // Buy ONE bundle, then PAYG for any rides past its minute capacity.
+    function singleBundleCost(rides, avg, b) {
+      if (rides <= 0) return 0;
+      const ridesInBundle = avg > 0 ? Math.floor(b.mins / avg) : Infinity;
+      const ridesOver = Math.max(0, rides - ridesInBundle);
+      return b.price + ridesOver * paygCost(avg);
+    }
+    function bundleBreakdown(rides, avg, b) {
+      if (rides <= 0) return '—';
+      const ridesInBundle = avg > 0 ? Math.floor(b.mins / avg) : Infinity;
+      const ridesOver = Math.max(0, rides - ridesInBundle);
+      if (ridesOver === 0) return `${b.mins}m bundle covers ${rides}× ${avg}m`;
+      return `${b.mins}m bundle + ${ridesOver} PAYG ride${ridesOver === 1 ? '' : 's'}`;
+    }
+
     // --- Series colours (pastel, with enough contrast on warm white) -
     const COLORS = {
       payg:    '#d6864a',
@@ -514,44 +576,20 @@
     // ============================================================
     const MAX_RPM = 200;
 
+    // Bundle tabs — one per LimePass duration. Order matches BUNDLES.
+    const BUNDLE_TABS = [
+      { label: '1D',  color: COLORS.b30  },
+      { label: '3D',  color: COLORS.b60  },
+      { label: '7D',  color: COLORS.b200 },
+      { label: '30D', color: COLORS.b400 },
+    ];
+    let currentBundleIdx = 3;
+
     function paygMonthlyRides(rides, avg) {
       return rides * paygCost(avg);
     }
     function primeMonthlyRides(rides, avg) {
       return PRIME.sub + rides * primeRideCost(avg);
-    }
-
-    // Cheapest combination of bundles covering `totalMins`.
-    // Bundles must be bought whole; unused minutes expire.
-    function passByMins(totalMins) {
-      if (totalMins <= 0) return { cost: 0, counts: [0,0,0,0] };
-      const order = [3, 2, 1, 0]; // largest first for tighter pruning
-      let best = { cost: Infinity, counts: [0,0,0,0] };
-      function recurse(orderIdx, counts, minsCovered, cost) {
-        if (cost >= best.cost) return;
-        if (minsCovered >= totalMins) {
-          best = { cost, counts: counts.slice() };
-          return;
-        }
-        if (orderIdx >= order.length) return;
-        const i = order[orderIdx];
-        const b = BUNDLES[i];
-        const remaining = totalMins - minsCovered;
-        const maxN = Math.ceil(remaining / b.mins) + 1;
-        for (let n = maxN; n >= 0; n--) {
-          counts[i] = n;
-          recurse(orderIdx + 1, counts, minsCovered + n * b.mins, cost + n * b.price);
-        }
-        counts[i] = 0;
-      }
-      recurse(0, [0,0,0,0], 0, 0);
-      return best;
-    }
-    function passBreakdown(counts) {
-      return counts
-        .map((n, i) => n > 0 ? `${n}×${BUNDLES[i].mins}m` : null)
-        .filter(Boolean)
-        .join(' + ') || '—';
     }
 
     const monthly = (function() {
@@ -563,11 +601,16 @@
 
       const g = svg.append('g').attr('transform', `translate(${M.left},${M.top})`);
 
-      const PLANS = [
-        { id: 'payg',  label: 'PAYG',      color: COLORS.payg,  sub: '£1 unlock + 31p/min' },
-        { id: 'prime', label: 'LimePrime', color: COLORS.prime, sub: '£6.99/mo + ride tiers' },
-        { id: 'pass',  label: 'LimePass',  color: COLORS.b200,  sub: 'Best bundle combo' },
-      ];
+      function computePlans() {
+        const tab = BUNDLE_TABS[currentBundleIdx];
+        const b = BUNDLES[currentBundleIdx];
+        return [
+          { id: 'payg',  label: 'PAYG',                color: COLORS.payg,  sub: '£1 unlock + 31p/min' },
+          { id: 'prime', label: 'LimePrime',           color: COLORS.prime, sub: '£6.99/mo + ride tiers' },
+          { id: 'pass',  label: `Pass · ${tab.label}`, color: tab.color,    sub: `£${b.price.toFixed(2)} / ${b.mins}m + PAYG overage` },
+        ];
+      }
+      let PLANS = computePlans();
 
       const x = d3.scaleLinear().domain([0, MAX_RPM]).range([0, iw]);
       const y = d3.scaleLinear().range([ih, 0]);
@@ -629,9 +672,10 @@
       let lines = null;
 
       function computeLines(avg) {
+        const b = BUNDLES[currentBundleIdx];
         const payg  = SAMPLES.map(r => ({ r, c: paygMonthlyRides(r, avg) }));
         const prime = SAMPLES.map(r => ({ r, c: primeMonthlyRides(r, avg) }));
-        const pass  = SAMPLES.map(r => ({ r, c: passByMins(r * avg).cost }));
+        const pass  = SAMPLES.map(r => ({ r, c: singleBundleCost(r, avg, b) }));
         return { payg, prime, pass };
       }
 
@@ -669,17 +713,17 @@
 
       function updateCursor(rides, avg) {
         const totalMins = rides * avg;
+        const b = BUNDLES[currentBundleIdx];
         cursor.attr('x1', x(rides)).attr('x2', x(rides));
 
         const cPayg  = paygMonthlyRides(rides, avg);
         const cPrime = primeMonthlyRides(rides, avg);
-        const passResult = passByMins(totalMins);
-        const cPass  = passResult.cost;
+        const cPass  = singleBundleCost(rides, avg, b);
 
         const data = [
           { id: 'payg',  cost: cPayg,  sub: `${rides.toFixed(0)} rides · ${totalMins.toFixed(0)} min` },
           { id: 'prime', cost: cPrime, sub: '£6.99 sub + rides' },
-          { id: 'pass',  cost: cPass,  sub: passBreakdown(passResult.counts) },
+          { id: 'pass',  cost: cPass,  sub: bundleBreakdown(rides, avg, b) },
         ];
 
         data.forEach(d => {
@@ -725,7 +769,25 @@
         document.getElementById('winner-text').innerHTML = summary;
       }
 
-      return { rerenderLines, updateCursor };
+      function setBundle(idx) {
+        currentBundleIdx = idx;
+        PLANS = computePlans();
+        const passPlan = PLANS.find(p => p.id === 'pass');
+        paths['pass'].attr('stroke', passPlan.color);
+        dots['pass'].attr('fill', passPlan.color);
+        endLabels['pass'].attr('fill', passPlan.color);
+        // Refresh legend entry for pass (3rd swatch).
+        d3.select('#legend-monthly').selectAll('span.entry')
+          .data(PLANS)
+          .html(d => `<span class="swatch" style="background:${d.color}"></span>${d.label}`);
+        // Refresh results table row for pass.
+        d3.select('#results-monthly tbody').selectAll('tr')
+          .data(PLANS)
+          .select('td.name')
+          .html(d => `<span class="swatch" style="background:${d.color}"></span><span class="name">${d.label}</span><span class="sub" id="sub-${d.id}">${d.sub}</span>`);
+      }
+
+      return { rerenderLines, updateCursor, setBundle };
     })();
 
     let currentAvg = null;
@@ -742,6 +804,34 @@
     }
     document.getElementById('rpm').addEventListener('input', readInputs);
     document.getElementById('avg').addEventListener('input', readInputs);
+
+    // Bundle tab rendering + selection
+    function selectBundle(idx) {
+      monthly.setBundle(idx);
+      document.querySelectorAll('.bundle-tab').forEach((el, i) => {
+        const active = i === idx;
+        el.classList.toggle('active', active);
+        el.setAttribute('aria-selected', active ? 'true' : 'false');
+      });
+      currentAvg = null; // force line recompute on next readInputs
+      readInputs();
+    }
+    (function renderTabs() {
+      const container = document.querySelector('.bundle-tabs');
+      BUNDLE_TABS.forEach((tab, i) => {
+        const b = BUNDLES[i];
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.setAttribute('role', 'tab');
+        btn.className = 'bundle-tab' + (i === currentBundleIdx ? ' active' : '');
+        btn.style.setProperty('--bt-color', tab.color);
+        btn.setAttribute('aria-selected', i === currentBundleIdx ? 'true' : 'false');
+        btn.innerHTML = `<span class="bt-top">${tab.label}</span><span class="bt-bot">${b.mins}m · £${b.price.toFixed(2)}</span>`;
+        btn.addEventListener('click', () => selectBundle(i));
+        container.appendChild(btn);
+      });
+    })();
+
     readInputs();
   })();
   </script>
