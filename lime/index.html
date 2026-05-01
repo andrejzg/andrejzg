@@ -574,7 +574,14 @@
     // ============================================================
     // Monthly cost — vs rides per month, with avg ride length slider
     // ============================================================
-    const MAX_RPM = 200;
+
+    // X-axis auto-scales to ~1.25× current rpm, snapped to a nice ladder.
+    const RPM_NICE_STEPS = [20, 25, 30, 35, 40, 50, 60, 75, 90, 100, 125, 150, 175, 200, 225, 250, 300];
+    function chartMaxFor(rpm) {
+      const target = Math.max(20, Math.ceil(rpm * 1.25));
+      for (const s of RPM_NICE_STEPS) if (s >= target) return s;
+      return RPM_NICE_STEPS[RPM_NICE_STEPS.length - 1];
+    }
 
     // Bundle tabs — one per LimePass duration. Order matches BUNDLES.
     const BUNDLE_TABS = [
@@ -612,7 +619,8 @@
       }
       let PLANS = computePlans();
 
-      const x = d3.scaleLinear().domain([0, MAX_RPM]).range([0, iw]);
+      let viewMaxRpm = 30;
+      const x = d3.scaleLinear().domain([0, viewMaxRpm]).range([0, iw]);
       const y = d3.scaleLinear().range([ih, 0]);
 
       const gridG = g.append('g').attr('class', 'grid');
@@ -668,7 +676,7 @@
       rows.append('td').attr('class', 'cost').attr('id', d => 'cost-' + d.id);
 
       // Pre-compute lines on avg change
-      const SAMPLES = d3.range(0, MAX_RPM + 1, 1);
+      let SAMPLES = d3.range(0, viewMaxRpm + 1, 1);
       let lines = null;
 
       function computeLines(avg) {
@@ -679,7 +687,13 @@
         return { payg, prime, pass };
       }
 
-      function rerenderLines(avg) {
+      function rerenderLines(avg, newViewMax) {
+        if (newViewMax !== undefined && newViewMax !== viewMaxRpm) {
+          viewMaxRpm = newViewMax;
+          SAMPLES = d3.range(0, viewMaxRpm + 1, 1);
+          x.domain([0, viewMaxRpm]);
+          xAxisG.call(d3.axisBottom(x).ticks(5).tickFormat(d => Math.round(d)));
+        }
         lines = computeLines(avg);
 
         const allCosts = PLANS.flatMap(p => lines[p.id].map(d => d.c));
@@ -791,14 +805,17 @@
     })();
 
     let currentAvg = null;
+    let currentViewMax = null;
     function readInputs() {
       const rpm = +document.getElementById('rpm').value;
       const avg = +document.getElementById('avg').value;
+      const viewMax = chartMaxFor(rpm);
       document.getElementById('rpm-val').textContent = rpm;
       document.getElementById('avg-val').textContent = avg;
-      if (avg !== currentAvg) {
-        monthly.rerenderLines(avg);
+      if (avg !== currentAvg || viewMax !== currentViewMax) {
+        monthly.rerenderLines(avg, viewMax);
         currentAvg = avg;
+        currentViewMax = viewMax;
       }
       monthly.updateCursor(rpm, avg);
     }
