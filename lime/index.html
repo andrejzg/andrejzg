@@ -424,9 +424,9 @@
 
       <div class="calc-grid">
         <div class="field">
-          <div class="field-label">Rides per week</div>
-          <div class="field-value"><span id="rpw-val">5</span><span class="unit">/week</span></div>
-          <input id="rpw" type="range" min="0" max="40" value="5" step="1" />
+          <div class="field-label">Rides per month</div>
+          <div class="field-value"><span id="rpm-val">22</span><span class="unit">/month</span></div>
+          <input id="rpm" type="range" min="0" max="200" value="22" step="1" />
         </div>
         <div class="field">
           <div class="field-label">Average ride length</div>
@@ -454,7 +454,7 @@
       </div>
 
       <p class="notes">
-        X-axis is rides per month (= rides/week × 4.33). LimePass uses the cheapest combination of bundles that covers your monthly minutes — its line is stepped because you can only buy whole bundles, and any unused minutes expire. Numbers reflect London PAYG rates after the November 2025 hike (£1 unlock + 31p/min, with a £1 flat for rides under 5 min).
+        LimePass uses the cheapest combination of bundles that covers your monthly minutes — its line is stepped because you can only buy whole bundles, and any unused minutes expire. Numbers reflect London PAYG rates after the November 2025 hike (£1 unlock + 31p/min, with a £1 flat for rides under 5 min).
       </p>
     </section>
 
@@ -512,9 +512,7 @@
     // ============================================================
     // Monthly cost — vs rides per month, with avg ride length slider
     // ============================================================
-    const WEEKS_PER_MONTH = 4.33;
-    const MAX_RPW = 40;
-    const MAX_RPM = MAX_RPW * WEEKS_PER_MONTH;
+    const MAX_RPM = 200;
 
     function paygMonthlyRides(rides, avg) {
       return rides * paygCost(avg);
@@ -669,8 +667,7 @@
         });
       }
 
-      function updateCursor(rpw, avg) {
-        const rides = rpw * WEEKS_PER_MONTH;
+      function updateCursor(rides, avg) {
         const totalMins = rides * avg;
         cursor.attr('x1', x(rides)).attr('x2', x(rides));
 
@@ -733,17 +730,17 @@
 
     let currentAvg = null;
     function readInputs() {
-      const rpw = +document.getElementById('rpw').value;
+      const rpm = +document.getElementById('rpm').value;
       const avg = +document.getElementById('avg').value;
-      document.getElementById('rpw-val').textContent = rpw;
+      document.getElementById('rpm-val').textContent = rpm;
       document.getElementById('avg-val').textContent = avg;
       if (avg !== currentAvg) {
         monthly.rerenderLines(avg);
         currentAvg = avg;
       }
-      monthly.updateCursor(rpw, avg);
+      monthly.updateCursor(rpm, avg);
     }
-    document.getElementById('rpw').addEventListener('input', readInputs);
+    document.getElementById('rpm').addEventListener('input', readInputs);
     document.getElementById('avg').addEventListener('input', readInputs);
     readInputs();
   })();
