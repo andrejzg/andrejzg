@@ -365,24 +365,23 @@
       display: grid;
       grid-template-columns: repeat(4, 1fr);
       gap: 6px;
-      margin-bottom: 14px;
+      margin-bottom: 10px;
     }
     .bundle-tab {
       background: var(--bg-soft);
       border: 1px solid var(--line);
       border-radius: var(--radius-sm);
-      padding: 10px 8px;
+      padding: 10px 6px 6px;
       font-family: inherit;
-      cursor: pointer;
       text-align: center;
       transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
       color: var(--text-dim);
       display: flex;
       flex-direction: column;
+      align-items: center;
       gap: 2px;
       -webkit-tap-highlight-color: transparent;
     }
-    .bundle-tab:hover { background: #fff; }
     .bundle-tab .bt-top {
       font-size: 15px;
       font-weight: 600;
@@ -400,9 +399,78 @@
       box-shadow: inset 0 -3px 0 var(--bt-color, var(--text-dim));
     }
     .bundle-tab.active .bt-top { color: var(--bt-color, var(--text)); }
+    .bundle-tab .bt-counter {
+      margin-top: 6px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-variant-numeric: tabular-nums;
+    }
+    .bundle-tab .bt-btn {
+      width: 22px;
+      height: 22px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--text-dim);
+      font-size: 14px;
+      font-weight: 600;
+      line-height: 1;
+      cursor: pointer;
+      padding: 0;
+      font-family: inherit;
+      transition: background 0.1s, border-color 0.1s, color 0.1s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .bundle-tab .bt-btn:hover:not(:disabled) {
+      background: var(--bt-color, var(--text-dim));
+      color: #fff;
+      border-color: var(--bt-color, var(--text-dim));
+    }
+    .bundle-tab .bt-btn:disabled { opacity: 0.35; cursor: default; }
+    .bundle-tab .bt-count {
+      min-width: 18px;
+      text-align: center;
+      font-weight: 600;
+      color: var(--text);
+      font-size: 14px;
+    }
+    .bundle-tab.active .bt-count { color: var(--bt-color, var(--text)); }
+
+    .bundle-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+    .bundle-action {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+      padding: 6px 12px;
+      font-family: inherit;
+      font-size: 13px;
+      cursor: pointer;
+      color: var(--text);
+      transition: background 0.1s, border-color 0.1s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .bundle-action:hover { background: var(--bg-soft); border-color: var(--text-faint); }
+    .bundle-action.primary {
+      background: var(--lime-soft);
+      border-color: rgba(130,168,56,0.4);
+      color: #4a6b1f;
+      font-weight: 500;
+    }
+    .bundle-action.primary:hover { background: #dfeebd; }
     @media (max-width: 480px) {
-      .bundle-tab { padding: 8px 4px; }
+      .bundle-tab { padding: 8px 2px 6px; }
       .bundle-tab .bt-bot { font-size: 10px; }
+      .bundle-tab .bt-btn { width: 20px; height: 20px; font-size: 13px; }
+      .bundle-tab .bt-counter { gap: 2px; }
     }
     footer {
       margin-top: 40px;
@@ -465,9 +533,13 @@
     <!-- Monthly cost vs usage -->
     <section class="card">
       <h2>Your monthly cost · vs how much you ride</h2>
-      <h3>Pick a LimePass bundle, see when it beats PAYG and LimePrime.</h3>
+      <h3>Stack any combination of LimePass bundles, see when it beats PAYG and LimePrime.</h3>
 
-      <div class="bundle-tabs" role="tablist" aria-label="LimePass bundle"></div>
+      <div class="bundle-tabs" aria-label="LimePass bundles"></div>
+      <div class="bundle-actions">
+        <button type="button" class="bundle-action" id="passes-clear">Clear</button>
+        <button type="button" class="bundle-action primary" id="passes-optimal">Find optimal combo</button>
+      </div>
 
       <div class="calc-grid">
         <div class="field">
@@ -501,7 +573,7 @@
       </div>
 
       <p class="notes">
-        Each tab models <em>one</em> LimePass bundle of that duration: flat at the bundle price up to its included minutes, then PAYG (£1 unlock + 31p/min, with a £1 flat for rides under 5 min) for any extra rides. Any minutes not used inside the bundle expire. Sub-monthly bundles (1D / 3D / 7D) get expensive quickly past their cap because realistically you'd buy another — switch tabs to compare. London PAYG rates as of the November 2025 hike.
+        Use <b>+</b> / <b>−</b> to stack any combination of LimePass bundles. The combo's minutes pool together; the line stays flat at the total bundle price up to the pooled minutes, then climbs at PAYG rates (£1 unlock + 31p/min, £1 flat under 5 min) for any extra rides. <b>Find optimal combo</b> brute-forces the cheapest stack for your current rides/avg. Unused minutes show what you paid for and didn't ride — valued at the combo's blended per-minute rate. London PAYG rates as of the November 2025 hike.
       </p>
     </section>
 
@@ -538,19 +610,90 @@
     function bundlePerMin(b) { return b.price / b.mins; }
     function bundleRideCost(b, t) { return Math.max(0, t) * bundlePerMin(b); }
 
-    // Buy ONE bundle, then PAYG for any rides past its minute capacity.
-    function singleBundleCost(rides, avg, b) {
-      if (rides <= 0) return 0;
-      const ridesInBundle = avg > 0 ? Math.floor(b.mins / avg) : Infinity;
-      const ridesOver = Math.max(0, rides - ridesInBundle);
-      return b.price + ridesOver * paygCost(avg);
+    // Multi-bundle combo: stack any number of any bundles. Their minutes
+    // pool together; once the pool is exhausted, extra rides are full PAYG.
+    function comboCapacity(counts) {
+      return BUNDLES.reduce((s, b, i) => s + counts[i] * b.mins, 0);
     }
-    function bundleBreakdown(rides, avg, b) {
+    function comboBundleCost(counts) {
+      return BUNDLES.reduce((s, b, i) => s + counts[i] * b.price, 0);
+    }
+    function comboTotalCount(counts) {
+      return counts.reduce((s, c) => s + c, 0);
+    }
+    function comboCost(rides, avg, counts) {
+      if (rides <= 0) return 0;
+      const cap = comboCapacity(counts);
+      if (cap === 0) return rides * paygCost(avg);
+      const ridesInBundles = avg > 0 ? Math.floor(cap / avg) : Infinity;
+      const ridesOver = Math.max(0, rides - ridesInBundles);
+      return comboBundleCost(counts) + ridesOver * paygCost(avg);
+    }
+    function comboUnusedMinutes(rides, avg, counts) {
+      const cap = comboCapacity(counts);
+      if (cap === 0) return 0;
+      const used = Math.min(rides * avg, cap);
+      return Math.max(0, cap - used);
+    }
+    // £ "lost" on unused minutes, valued at the cheapest bundle's per-min rate.
+    // Using the cheapest (largest) bundle's rate gives a fair lower-bound on waste.
+    function comboUnusedCost(rides, avg, counts) {
+      const unused = comboUnusedMinutes(rides, avg, counts);
+      if (unused === 0) return 0;
+      // Per-minute rate of the bundles actually held, weighted by minutes.
+      const cap = comboCapacity(counts);
+      const cost = comboBundleCost(counts);
+      return unused * (cost / cap);
+    }
+    function comboLabel(counts) {
+      const parts = [];
+      counts.forEach((c, i) => {
+        if (c > 0) parts.push(c === 1 ? `${BUNDLES[i].mins}m` : `${c}×${BUNDLES[i].mins}m`);
+      });
+      return parts.join(' + ') || '—';
+    }
+    function comboBreakdown(rides, avg, counts) {
       if (rides <= 0) return '—';
-      const ridesInBundle = avg > 0 ? Math.floor(b.mins / avg) : Infinity;
-      const ridesOver = Math.max(0, rides - ridesInBundle);
-      if (ridesOver === 0) return `${b.mins}m bundle covers ${rides}× ${avg}m`;
-      return `${b.mins}m bundle + ${ridesOver} PAYG ride${ridesOver === 1 ? '' : 's'}`;
+      const total = comboTotalCount(counts);
+      if (total === 0) return 'No passes — all PAYG';
+      const cap = comboCapacity(counts);
+      const ridesInBundles = avg > 0 ? Math.floor(cap / avg) : Infinity;
+      const ridesOver = Math.max(0, rides - ridesInBundles);
+      const label = comboLabel(counts);
+      if (ridesOver === 0) return `${label} (covers ${Math.min(rides, ridesInBundles)} rides)`;
+      return `${label} + ${ridesOver} PAYG ride${ridesOver === 1 ? '' : 's'}`;
+    }
+    // Bundle whose minutes contribute most — drives the chart line colour.
+    function dominantBundleIdx(counts) {
+      let best = -1, bestCap = 0;
+      counts.forEach((c, i) => {
+        const cap = c * BUNDLES[i].mins;
+        if (cap > bestCap) { bestCap = cap; best = i; }
+      });
+      return best;
+    }
+    // Brute-force search for the cheapest combo at given (rides, avg).
+    function findOptimalCounts(rides, avg) {
+      if (rides <= 0 || avg <= 0) return [0, 0, 0, 0];
+      const totalMins = rides * avg;
+      // Hard caps keep the search tractable. Larger bundles dominate cost-per-min,
+      // so the optimum rarely needs many of the smaller ones.
+      const caps = [
+        Math.min(6, Math.ceil(totalMins / 30) + 1),
+        Math.min(6, Math.ceil(totalMins / 60) + 1),
+        Math.min(8, Math.ceil(totalMins / 200) + 1),
+        Math.min(4, Math.ceil(totalMins / 400) + 1),
+      ];
+      let best = { counts: [0,0,0,0], cost: rides * paygCost(avg) };
+      for (let n0 = 0; n0 <= caps[0]; n0++)
+      for (let n1 = 0; n1 <= caps[1]; n1++)
+      for (let n2 = 0; n2 <= caps[2]; n2++)
+      for (let n3 = 0; n3 <= caps[3]; n3++) {
+        const counts = [n0, n1, n2, n3];
+        const cost = comboCost(rides, avg, counts);
+        if (cost < best.cost - 0.005) best = { counts, cost };
+      }
+      return best.counts;
     }
 
     // --- Series colours (pastel, with enough contrast on warm white) -
@@ -590,7 +733,8 @@
       { label: '7D',  color: COLORS.b200 },
       { label: '30D', color: COLORS.b400 },
     ];
-    let currentBundleIdx = 3;
+    // Counts of each bundle currently in the user's combo. Default: 1× 30D.
+    let passCounts = [0, 0, 0, 1];
 
     function paygMonthlyRides(rides, avg) {
       return rides * paygCost(avg);
@@ -609,12 +753,17 @@
       const g = svg.append('g').attr('transform', `translate(${M.left},${M.top})`);
 
       function computePlans() {
-        const tab = BUNDLE_TABS[currentBundleIdx];
-        const b = BUNDLES[currentBundleIdx];
+        const dom = dominantBundleIdx(passCounts);
+        const passColor = dom < 0 ? COLORS.b400 : BUNDLE_TABS[dom].color;
+        const cap = comboCapacity(passCounts);
+        const cost = comboBundleCost(passCounts);
+        const passSub = cap === 0
+          ? 'Add a pass with the + buttons above'
+          : `£${cost.toFixed(2)} · ${cap}m capacity`;
         return [
-          { id: 'payg',  label: 'PAYG',                color: COLORS.payg,  sub: '£1 unlock + 31p/min' },
-          { id: 'prime', label: 'LimePrime',           color: COLORS.prime, sub: '£6.99/mo + ride tiers' },
-          { id: 'pass',  label: `Pass · ${tab.label}`, color: tab.color,    sub: `£${b.price.toFixed(2)} / ${b.mins}m + PAYG overage` },
+          { id: 'payg',  label: 'PAYG',      color: COLORS.payg,  sub: '£1 unlock + 31p/min' },
+          { id: 'prime', label: 'LimePrime', color: COLORS.prime, sub: '£6.99/mo + ride tiers' },
+          { id: 'pass',  label: 'LimePass',  color: passColor,    sub: passSub },
         ];
       }
       let PLANS = computePlans();
@@ -680,10 +829,9 @@
       let lines = null;
 
       function computeLines(avg) {
-        const b = BUNDLES[currentBundleIdx];
         const payg  = SAMPLES.map(r => ({ r, c: paygMonthlyRides(r, avg) }));
         const prime = SAMPLES.map(r => ({ r, c: primeMonthlyRides(r, avg) }));
-        const pass  = SAMPLES.map(r => ({ r, c: singleBundleCost(r, avg, b) }));
+        const pass  = SAMPLES.map(r => ({ r, c: comboCost(r, avg, passCounts) }));
         return { payg, prime, pass };
       }
 
@@ -727,39 +875,50 @@
 
       function updateCursor(rides, avg) {
         const totalMins = rides * avg;
-        const b = BUNDLES[currentBundleIdx];
         cursor.attr('x1', x(rides)).attr('x2', x(rides));
 
         const cPayg  = paygMonthlyRides(rides, avg);
         const cPrime = primeMonthlyRides(rides, avg);
-        const cPass  = singleBundleCost(rides, avg, b);
+        const cPass  = comboCost(rides, avg, passCounts);
 
+        const passSub = (() => {
+          const total = comboTotalCount(passCounts);
+          if (total === 0) return 'No passes — add some above';
+          const breakdown = comboBreakdown(rides, avg, passCounts);
+          const unused = comboUnusedMinutes(rides, avg, passCounts);
+          if (unused === 0 || rides === 0) return breakdown;
+          const lostCost = comboUnusedCost(rides, avg, passCounts);
+          return `${breakdown} · ${Math.round(unused)}m unused (£${lostCost.toFixed(2)} lost)`;
+        })();
+
+        const passActive = comboTotalCount(passCounts) > 0;
         const data = [
-          { id: 'payg',  cost: cPayg,  sub: `${rides.toFixed(0)} rides · ${totalMins.toFixed(0)} min` },
-          { id: 'prime', cost: cPrime, sub: '£6.99 sub + rides' },
-          { id: 'pass',  cost: cPass,  sub: bundleBreakdown(rides, avg, b) },
+          { id: 'payg',  cost: cPayg,  sub: `${rides.toFixed(0)} rides · ${totalMins.toFixed(0)} min`, active: true },
+          { id: 'prime', cost: cPrime, sub: '£6.99 sub + rides',                                       active: true },
+          { id: 'pass',  cost: cPass,  sub: passSub,                                                   active: passActive },
         ];
 
         data.forEach(d => {
           dots[d.id].attr('cx', x(rides)).attr('cy', y(d.cost));
         });
 
-        const minCost = Math.min(...data.map(d => d.cost));
+        const visible = data.filter(d => d.active);
+        const minCost = Math.min(...visible.map(d => d.cost));
 
         data.forEach(d => {
-          d3.select('#cost-' + d.id).text('£' + d.cost.toFixed(2))
-            .classed('win', Math.abs(d.cost - minCost) < 0.005 && rides > 0)
-            .classed('bad', d.cost > minCost * 1.6);
+          d3.select('#cost-' + d.id).text(d.active ? '£' + d.cost.toFixed(2) : '—')
+            .classed('win', d.active && Math.abs(d.cost - minCost) < 0.005 && rides > 0)
+            .classed('bad', d.active && d.cost > minCost * 1.6);
           d3.select('#sub-' + d.id).text(d.sub);
         });
 
-        // Winner banner
-        const winners = data.filter(d => Math.abs(d.cost - minCost) < 0.005);
+        // Winner banner — only consider plans with active state
+        const winners = visible.filter(d => Math.abs(d.cost - minCost) < 0.005);
         const wName = winners
           .map(w => PLANS.find(p => p.id === w.id).label)
           .join(' / ');
 
-        const altsSorted = data
+        const altsSorted = visible
           .filter(d => Math.abs(d.cost - minCost) >= 0.005)
           .sort((a, b) => a.cost - b.cost);
 
@@ -783,25 +942,28 @@
         document.getElementById('winner-text').innerHTML = summary;
       }
 
-      function setBundle(idx) {
-        currentBundleIdx = idx;
+      function refreshPassVisuals() {
         PLANS = computePlans();
         const passPlan = PLANS.find(p => p.id === 'pass');
         paths['pass'].attr('stroke', passPlan.color);
         dots['pass'].attr('fill', passPlan.color);
         endLabels['pass'].attr('fill', passPlan.color);
-        // Refresh legend entry for pass (3rd swatch).
+        // Hide the pass curve when no passes are selected — otherwise it
+        // overlaps PAYG identically and looks like a rendering bug.
+        const passVisible = comboTotalCount(passCounts) > 0;
+        paths['pass'].attr('opacity', passVisible ? 0.9 : 0);
+        dots['pass'].attr('opacity', passVisible ? 1 : 0);
+        endLabels['pass'].attr('opacity', passVisible ? 0.9 : 0);
         d3.select('#legend-monthly').selectAll('span.entry')
           .data(PLANS)
           .html(d => `<span class="swatch" style="background:${d.color}"></span>${d.label}`);
-        // Refresh results table row for pass.
         d3.select('#results-monthly tbody').selectAll('tr')
           .data(PLANS)
           .select('td.name')
           .html(d => `<span class="swatch" style="background:${d.color}"></span><span class="name">${d.label}</span><span class="sub" id="sub-${d.id}">${d.sub}</span>`);
       }
 
-      return { rerenderLines, updateCursor, setBundle };
+      return { rerenderLines, updateCursor, refreshPassVisuals };
     })();
 
     let currentAvg = null;
@@ -822,32 +984,60 @@
     document.getElementById('rpm').addEventListener('input', readInputs);
     document.getElementById('avg').addEventListener('input', readInputs);
 
-    // Bundle tab rendering + selection
-    function selectBundle(idx) {
-      monthly.setBundle(idx);
-      document.querySelectorAll('.bundle-tab').forEach((el, i) => {
-        const active = i === idx;
-        el.classList.toggle('active', active);
-        el.setAttribute('aria-selected', active ? 'true' : 'false');
-      });
+    // Bundle counter cards + actions
+    function setPassCounts(newCounts) {
+      passCounts = newCounts.slice();
+      monthly.refreshPassVisuals();
+      updateTabUi();
       currentAvg = null; // force line recompute on next readInputs
       readInputs();
+    }
+    function updateTabUi() {
+      document.querySelectorAll('.bundle-tab').forEach((card, i) => {
+        const count = passCounts[i];
+        card.classList.toggle('active', count > 0);
+        card.querySelector('.bt-count').textContent = count;
+        card.querySelector('.bt-minus').disabled = count === 0;
+      });
     }
     (function renderTabs() {
       const container = document.querySelector('.bundle-tabs');
       BUNDLE_TABS.forEach((tab, i) => {
         const b = BUNDLES[i];
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.setAttribute('role', 'tab');
-        btn.className = 'bundle-tab' + (i === currentBundleIdx ? ' active' : '');
-        btn.style.setProperty('--bt-color', tab.color);
-        btn.setAttribute('aria-selected', i === currentBundleIdx ? 'true' : 'false');
-        btn.innerHTML = `<span class="bt-top">${tab.label}</span><span class="bt-bot">${b.mins}m · £${b.price.toFixed(2)}</span>`;
-        btn.addEventListener('click', () => selectBundle(i));
-        container.appendChild(btn);
+        const card = document.createElement('div');
+        card.className = 'bundle-tab' + (passCounts[i] > 0 ? ' active' : '');
+        card.style.setProperty('--bt-color', tab.color);
+        card.innerHTML = `
+          <span class="bt-top">${tab.label}</span>
+          <span class="bt-bot">${b.mins}m · £${b.price.toFixed(2)}</span>
+          <span class="bt-counter">
+            <button type="button" class="bt-btn bt-minus" aria-label="Remove a ${tab.label} pass"${passCounts[i] === 0 ? ' disabled' : ''}>−</button>
+            <span class="bt-count">${passCounts[i]}</span>
+            <button type="button" class="bt-btn bt-plus" aria-label="Add a ${tab.label} pass">+</button>
+          </span>`;
+        card.querySelector('.bt-plus').addEventListener('click', () => {
+          const next = passCounts.slice();
+          next[i] = next[i] + 1;
+          setPassCounts(next);
+        });
+        card.querySelector('.bt-minus').addEventListener('click', () => {
+          if (passCounts[i] <= 0) return;
+          const next = passCounts.slice();
+          next[i] = next[i] - 1;
+          setPassCounts(next);
+        });
+        container.appendChild(card);
       });
     })();
+
+    document.getElementById('passes-clear').addEventListener('click', () => {
+      setPassCounts([0, 0, 0, 0]);
+    });
+    document.getElementById('passes-optimal').addEventListener('click', () => {
+      const rpm = +document.getElementById('rpm').value;
+      const avg = +document.getElementById('avg').value;
+      setPassCounts(findOptimalCounts(rpm, avg));
+    });
 
     readInputs();
   })();
