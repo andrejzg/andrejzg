@@ -573,7 +573,7 @@
       </div>
 
       <p class="notes">
-        Use <b>+</b> / <b>−</b> to stack any combination of LimePass bundles. The combo's minutes pool together; the line stays flat at the total bundle price up to the pooled minutes, then climbs at PAYG rates (£1 unlock + 31p/min, £1 flat under 5 min) for any extra rides. <b>Find optimal combo</b> brute-forces the cheapest stack for your current rides/avg. Unused minutes show what you paid for and didn't ride — valued at the combo's blended per-minute rate. London PAYG rates as of the November 2025 hike.
+        Use <b>+</b> / <b>−</b> to stack any combination of LimePass bundles. Each bundle only covers usage inside its validity window (1 / 3 / 7 / 30 days), so a 7-day pass can cover at most one week's rides — the line is colour-coded by which pass is being consumed at each point, with a dot at every transition. Buying more bundles than fit in a month (e.g. 2× 30D) wastes the extras. <b>Find optimal combo</b> brute-forces the cheapest realistic stack for your rides/avg. Unused minutes are valued at the combo's blended per-minute rate. London PAYG rates as of the November 2025 hike (£1 unlock + 31p/min, £1 flat under 5 min).
       </p>
     </section>
 
@@ -610,9 +610,18 @@
     function bundlePerMin(b) { return b.price / b.mins; }
     function bundleRideCost(b, t) { return Math.max(0, t) * bundlePerMin(b); }
 
-    // Multi-bundle combo: stack any number of any bundles. Their minutes
-    // pool together; once the pool is exhausted, extra rides are full PAYG.
-    function comboCapacity(counts) {
+    // Multi-bundle combo with bundle-expiry modelling.
+    //
+    // Each bundle covers up to b.mins minutes used inside b.validDays of
+    // purchase. With even ride distribution across the month, one bundle
+    // of type i covers at most min(b.mins, dailyMins × b.validDays). Buying
+    // more than ⌈30 / b.validDays⌉ bundles of one type gives overlapping
+    // validity windows in the same month — extras are pure waste.
+    const MONTH_DAYS = 30;
+    function maxUsefulCount(i) {
+      return Math.ceil(MONTH_DAYS / BUNDLES[i].validDays);
+    }
+    function comboRawCapacity(counts) {
       return BUNDLES.reduce((s, b, i) => s + counts[i] * b.mins, 0);
     }
     function comboBundleCost(counts) {
@@ -621,27 +630,38 @@
     function comboTotalCount(counts) {
       return counts.reduce((s, c) => s + c, 0);
     }
+    // Realistic minute coverage given expiry and even distribution.
+    function comboEffectiveCoverage(rides, avg, counts) {
+      if (rides <= 0 || avg <= 0) return 0;
+      const totalMins = rides * avg;
+      const dailyMins = totalMins / MONTH_DAYS;
+      let sumEff = 0;
+      for (let i = 0; i < BUNDLES.length; i++) {
+        const useful = Math.min(counts[i], maxUsefulCount(i));
+        const perBundle = Math.min(BUNDLES[i].mins, dailyMins * BUNDLES[i].validDays);
+        sumEff += useful * perBundle;
+      }
+      return Math.min(totalMins, sumEff);
+    }
     function comboCost(rides, avg, counts) {
       if (rides <= 0) return 0;
-      const cap = comboCapacity(counts);
-      if (cap === 0) return rides * paygCost(avg);
-      const ridesInBundles = avg > 0 ? Math.floor(cap / avg) : Infinity;
+      const total = comboTotalCount(counts);
+      if (total === 0) return rides * paygCost(avg);
+      const coveredMins = comboEffectiveCoverage(rides, avg, counts);
+      const ridesInBundles = avg > 0 ? Math.floor(coveredMins / avg) : Infinity;
       const ridesOver = Math.max(0, rides - ridesInBundles);
       return comboBundleCost(counts) + ridesOver * paygCost(avg);
     }
     function comboUnusedMinutes(rides, avg, counts) {
-      const cap = comboCapacity(counts);
+      const cap = comboRawCapacity(counts);
       if (cap === 0) return 0;
-      const used = Math.min(rides * avg, cap);
-      return Math.max(0, cap - used);
+      return Math.max(0, cap - comboEffectiveCoverage(rides, avg, counts));
     }
-    // £ "lost" on unused minutes, valued at the cheapest bundle's per-min rate.
-    // Using the cheapest (largest) bundle's rate gives a fair lower-bound on waste.
+    // Per-minute rate of the bundles held — used to value lost minutes.
     function comboUnusedCost(rides, avg, counts) {
       const unused = comboUnusedMinutes(rides, avg, counts);
       if (unused === 0) return 0;
-      // Per-minute rate of the bundles actually held, weighted by minutes.
-      const cap = comboCapacity(counts);
+      const cap = comboRawCapacity(counts);
       const cost = comboBundleCost(counts);
       return unused * (cost / cap);
     }
@@ -656,14 +676,13 @@
       if (rides <= 0) return '—';
       const total = comboTotalCount(counts);
       if (total === 0) return 'No passes — all PAYG';
-      const cap = comboCapacity(counts);
-      const ridesInBundles = avg > 0 ? Math.floor(cap / avg) : Infinity;
+      const coveredMins = comboEffectiveCoverage(rides, avg, counts);
+      const ridesInBundles = avg > 0 ? Math.floor(coveredMins / avg) : Infinity;
       const ridesOver = Math.max(0, rides - ridesInBundles);
       const label = comboLabel(counts);
-      if (ridesOver === 0) return `${label} (covers ${Math.min(rides, ridesInBundles)} rides)`;
+      if (ridesOver === 0) return `${label} (covers all ${rides} rides)`;
       return `${label} + ${ridesOver} PAYG ride${ridesOver === 1 ? '' : 's'}`;
     }
-    // Bundle whose minutes contribute most — drives the chart line colour.
     function dominantBundleIdx(counts) {
       let best = -1, bestCap = 0;
       counts.forEach((c, i) => {
@@ -672,18 +691,38 @@
       });
       return best;
     }
-    // Brute-force search for the cheapest combo at given (rides, avg).
+    // For color-coding the chart line: which bundle (or PAYG) is "consuming"
+    // the user's minutes at ride count r? Order: shortest validity first
+    // (use what expires soonest first). Within the flat plateau the color
+    // walks through each bundle's raw b.mins. Once the cost line starts
+    // climbing (overflow rides) the color switches to PAYG so the colored
+    // segments align with the actual cost shape, even when overflow comes
+    // from expiry waste rather than raw-capacity exhaustion.
+    function passInfoAt(r, avg, counts) {
+      if (r <= 0 || avg <= 0) return null;
+      if (comboTotalCount(counts) === 0) return null;
+      if (comboCost(r, avg, counts) > comboBundleCost(counts) + 1e-6) {
+        return { idx: -1, copy: 0, color: COLORS.payg, key: 'payg' };
+      }
+      const totalMins = r * avg;
+      let cumMins = 0;
+      for (let i = 0; i < BUNDLES.length; i++) {
+        const useful = Math.min(counts[i], maxUsefulCount(i));
+        for (let n = 0; n < useful; n++) {
+          cumMins += BUNDLES[i].mins;
+          if (totalMins <= cumMins + 1e-9) {
+            return { idx: i, copy: n, color: BUNDLE_TABS[i].color, key: `b${i}_${n}` };
+          }
+        }
+      }
+      return { idx: -1, copy: 0, color: COLORS.payg, key: 'payg' };
+    }
     function findOptimalCounts(rides, avg) {
       if (rides <= 0 || avg <= 0) return [0, 0, 0, 0];
+      // Cap search at maxUseful — beyond that, extra bundles are pure waste.
       const totalMins = rides * avg;
-      // Hard caps keep the search tractable. Larger bundles dominate cost-per-min,
-      // so the optimum rarely needs many of the smaller ones.
-      const caps = [
-        Math.min(6, Math.ceil(totalMins / 30) + 1),
-        Math.min(6, Math.ceil(totalMins / 60) + 1),
-        Math.min(8, Math.ceil(totalMins / 200) + 1),
-        Math.min(4, Math.ceil(totalMins / 400) + 1),
-      ];
+      const caps = BUNDLES.map((b, i) =>
+        Math.min(maxUsefulCount(i), Math.ceil(totalMins / b.mins) + 1));
       let best = { counts: [0,0,0,0], cost: rides * paygCost(avg) };
       for (let n0 = 0; n0 <= caps[0]; n0++)
       for (let n1 = 0; n1 <= caps[1]; n1++)
@@ -755,7 +794,7 @@
       function computePlans() {
         const dom = dominantBundleIdx(passCounts);
         const passColor = dom < 0 ? COLORS.b400 : BUNDLE_TABS[dom].color;
-        const cap = comboCapacity(passCounts);
+        const cap = comboRawCapacity(passCounts);
         const cost = comboBundleCost(passCounts);
         const passSub = cap === 0
           ? 'Add a pass with the + buttons above'
@@ -799,6 +838,11 @@
           .attr('fill', p.color)
           .attr('opacity', 0.9);
       });
+
+      // Group for the multi-coloured pass line segments + transition markers,
+      // drawn above the static single-colour pass path (which we now hide).
+      const passSegG = g.append('g').attr('class', 'pass-segments');
+      const passTransG = g.append('g').attr('class', 'pass-transitions');
 
       const cursor = g.append('line').attr('class', 'cursor-line').attr('y1', 0).attr('y2', ih);
       PLANS.forEach(p => {
@@ -871,6 +915,67 @@
         PLANS.forEach(p => {
           paths[p.id].datum(lines[p.id]).attr('d', lineFn);
         });
+        renderPassDecorations(avg);
+      }
+
+      // Builds per-segment paths for the pass line, coloured by which bundle
+      // (or PAYG) is "consuming" the user's minutes at each ride count. Adds
+      // a small marker at every transition between consecutive bundle copies.
+      function renderPassDecorations(avg) {
+        const totalCount = comboTotalCount(passCounts);
+        if (totalCount === 0) {
+          passSegG.selectAll('*').remove();
+          passTransG.selectAll('*').remove();
+          return;
+        }
+        // Walk samples; group consecutive samples sharing the same pass key
+        // into one polyline segment. Each segment carries the next sample as
+        // a shared boundary point so adjacent segments visually connect.
+        const segments = [];
+        const transitions = [];
+        const passLine = lines.pass;
+        let current = null;
+        for (let i = 0; i < SAMPLES.length; i++) {
+          const r = SAMPLES[i];
+          const info = passInfoAt(r, avg, passCounts);
+          if (info === null) { current = null; continue; }
+          const point = { r, c: passLine[i].c };
+          if (current === null || current.key !== info.key) {
+            if (current !== null) {
+              // Close the old segment exactly at the boundary point so it
+              // and the new segment share that vertex.
+              current.points.push(point);
+              transitions.push({ r, c: point.c, color: info.color });
+            }
+            current = { key: info.key, color: info.color, points: [point] };
+            segments.push(current);
+          } else {
+            current.points.push(point);
+          }
+        }
+
+        const segSel = passSegG.selectAll('path').data(segments, d => d.key + d.points[0].r);
+        segSel.exit().remove();
+        segSel.enter().append('path')
+          .attr('class', 'series-line pass-segment')
+          .attr('fill', 'none')
+          .attr('stroke-width', 2.5)
+          .attr('opacity', 0.9)
+          .attr('stroke-linecap', 'round')
+          .merge(segSel)
+          .attr('stroke', d => d.color)
+          .attr('d', d => lineFn(d.points));
+
+        const transSel = passTransG.selectAll('circle').data(transitions);
+        transSel.exit().remove();
+        transSel.enter().append('circle')
+          .attr('r', 3)
+          .attr('fill', '#fff')
+          .attr('stroke-width', 1.75)
+          .merge(transSel)
+          .attr('cx', d => x(d.r))
+          .attr('cy', d => y(d.c))
+          .attr('stroke', d => d.color);
       }
 
       function updateCursor(rides, avg) {
@@ -892,6 +997,12 @@
         })();
 
         const passActive = comboTotalCount(passCounts) > 0;
+        // Recolour the pass cursor dot to match whichever bundle is being
+        // "consumed" at the current ride count.
+        if (passActive) {
+          const info = passInfoAt(rides, avg, passCounts);
+          if (info) dots['pass'].attr('fill', info.color);
+        }
         const data = [
           { id: 'payg',  cost: cPayg,  sub: `${rides.toFixed(0)} rides · ${totalMins.toFixed(0)} min`, active: true },
           { id: 'prime', cost: cPrime, sub: '£6.99 sub + rides',                                       active: true },
@@ -942,18 +1053,19 @@
         document.getElementById('winner-text').innerHTML = summary;
       }
 
+      // The single pass path is always hidden — segments take over rendering.
+      paths['pass'].attr('opacity', 0);
+
       function refreshPassVisuals() {
         PLANS = computePlans();
         const passPlan = PLANS.find(p => p.id === 'pass');
-        paths['pass'].attr('stroke', passPlan.color);
-        dots['pass'].attr('fill', passPlan.color);
         endLabels['pass'].attr('fill', passPlan.color);
-        // Hide the pass curve when no passes are selected — otherwise it
-        // overlaps PAYG identically and looks like a rendering bug.
+        dots['pass'].attr('fill', passPlan.color);
         const passVisible = comboTotalCount(passCounts) > 0;
-        paths['pass'].attr('opacity', passVisible ? 0.9 : 0);
         dots['pass'].attr('opacity', passVisible ? 1 : 0);
         endLabels['pass'].attr('opacity', passVisible ? 0.9 : 0);
+        passSegG.attr('opacity', passVisible ? 1 : 0);
+        passTransG.attr('opacity', passVisible ? 1 : 0);
         d3.select('#legend-monthly').selectAll('span.entry')
           .data(PLANS)
           .html(d => `<span class="swatch" style="background:${d.color}"></span>${d.label}`);
