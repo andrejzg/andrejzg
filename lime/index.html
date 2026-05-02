@@ -763,6 +763,12 @@
       return arr;
     }
 
+    // Time-based "non-overlapping windows in a month" cap. Used as a
+    // sanity bound — but bundles WITH overlapping windows (e.g. two 30D
+    // passes bought 15 days apart, or a 7D pass bought during another
+    // 7D pass's window) are still useful as long as their minute caps
+    // aren't yet exhausted. So this is no longer a hard cap on placement;
+    // it just informs the optimal-search bounds alongside a usage bound.
     function maxUsefulCount(i) {
       return Math.ceil(MONTH_DAYS / BUNDLES[i].validDays);
     }
@@ -779,27 +785,34 @@
     // Greedy placement: process bundles shortest-validity-first, place
     // each one on the v-day window with the most remaining ride-minutes,
     // and proportionally consume those minutes so subsequent bundles
-    // pick complementary windows. Returns [{ idx, copy, start, end, cap, used }].
+    // pick complementary windows. Allows windows to extend past month
+    // end (e.g. a 30D pass bought day 16 covers days 16-30 in this
+    // month + 15 days into next). Returns [{ idx, copy, start, end, cap, used }].
     function placeBundles(counts, dayMins) {
       const remaining = dayMins.slice();
       const placements = [];
       for (let i = 0; i < BUNDLES.length; i++) {
-        const useful = Math.min(counts[i], maxUsefulCount(i));
         const v = BUNDLES[i].validDays;
         const cap = BUNDLES[i].mins;
-        const lastStart = MONTH_DAYS - v + 1;
-        for (let n = 0; n < useful; n++) {
+        for (let n = 0; n < counts[i]; n++) {
+          // Pick the start day with the most remaining ride-minutes in
+          // its window. Tie-break: prefer the LATEST such day so multiple
+          // same-type bundles spread across the month rather than stack.
           let bestStart = 1, bestSum = -1;
-          for (let s = 1; s <= lastStart; s++) {
+          for (let s = 1; s <= MONTH_DAYS; s++) {
             let sum = 0;
-            for (let d = s; d < s + v; d++) sum += remaining[d - 1];
-            if (sum > bestSum) { bestSum = sum; bestStart = s; }
+            for (let d = s; d < s + v && d <= MONTH_DAYS; d++) sum += remaining[d - 1];
+            if (sum > bestSum + 1e-9) { bestSum = sum; bestStart = s; }
+            else if (Math.abs(sum - bestSum) < 1e-9 && s > bestStart) { bestStart = s; }
           }
-          bestSum = Math.max(0, bestSum);
-          const used = Math.min(cap, bestSum);
-          if (bestSum > 1e-9 && used > 0) {
-            const ratio = used / bestSum;
-            for (let d = bestStart; d < bestStart + v; d++) remaining[d - 1] *= (1 - ratio);
+          // Chronological consumption: drain from the earliest active
+          // day onwards until the bundle's cap or window-end is reached.
+          // Anything left in the cap when the window ends is expiry waste.
+          let used = 0;
+          for (let d = bestStart; d < bestStart + v && d <= MONTH_DAYS && used < cap; d++) {
+            const take = Math.min(remaining[d - 1], cap - used);
+            remaining[d - 1] -= take;
+            used += take;
           }
           placements.push({
             idx: i, copy: n,
@@ -812,18 +825,17 @@
     }
 
     // Re-evaluate `used` for given placements at a different ride volume,
-    // using the same start days. Same proportional-subtract greedy logic.
+    // using the same start days and same chronological-consumption rule.
     function placementCoverage(placements, dayMins) {
       const remaining = dayMins.slice();
       let total = 0;
       const out = [];
       for (const p of placements) {
-        let sum = 0;
-        for (let d = p.start; d <= p.end && d <= MONTH_DAYS; d++) sum += remaining[d - 1];
-        const used = Math.min(p.cap, sum);
-        if (sum > 1e-9 && used > 0) {
-          const ratio = used / sum;
-          for (let d = p.start; d <= p.end && d <= MONTH_DAYS; d++) remaining[d - 1] *= (1 - ratio);
+        let used = 0;
+        for (let d = p.start; d <= p.end && d <= MONTH_DAYS && used < p.cap; d++) {
+          const take = Math.min(remaining[d - 1], p.cap - used);
+          remaining[d - 1] -= take;
+          used += take;
         }
         total += used;
         out.push({ ...p, used });
@@ -945,11 +957,17 @@
       }
       return { idx: -1, copy: 0, color: COLORS.payg, key: 'payg' };
     }
+    // Per-type hard caps for the brute-force search. Enough to find any
+    // realistic optimum without exploring obviously-wasteful stacks.
+    const OPTIMAL_HARD_CAPS = [12, 8, 6, 4]; // 1D, 3D, 7D, 30D
     function findOptimalCounts(rides, avg, distId) {
       if (rides <= 0 || avg <= 0) return [0, 0, 0, 0];
       const totalMins = rides * avg;
-      const caps = BUNDLES.map((b, i) =>
-        Math.min(maxUsefulCount(i), Math.ceil(totalMins / b.mins) + 1));
+      const caps = BUNDLES.map((b, i) => {
+        const time  = Math.ceil(MONTH_DAYS / b.validDays);
+        const usage = Math.ceil(totalMins / b.mins) + 1;
+        return Math.min(OPTIMAL_HARD_CAPS[i], Math.max(time, usage));
+      });
       let best = { counts: [0, 0, 0, 0], cost: rides * paygCost(avg) };
       const dayMins = dayMinsForDist(rides, avg, distId);
       for (let n0 = 0; n0 <= caps[0]; n0++)
