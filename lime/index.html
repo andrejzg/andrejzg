@@ -807,17 +807,21 @@
           }
           // Chronological consumption: drain from the earliest active
           // day onwards until the bundle's cap or window-end is reached.
-          // Anything left in the cap when the window ends is expiry waste.
+          // exhaustedAt = the day the bundle ran out (null if its window
+          // ends before its minutes do — i.e. expiry waste).
           let used = 0;
-          for (let d = bestStart; d < bestStart + v && d <= MONTH_DAYS && used < cap; d++) {
+          let exhaustedAt = null;
+          for (let d = bestStart; d < bestStart + v && d <= MONTH_DAYS; d++) {
+            if (used >= cap - 1e-9) break;
             const take = Math.min(remaining[d - 1], cap - used);
             remaining[d - 1] -= take;
             used += take;
+            if (used >= cap - 1e-9) exhaustedAt = d;
           }
           placements.push({
             idx: i, copy: n,
             start: bestStart, end: bestStart + v - 1,
-            cap, used,
+            cap, used, exhaustedAt,
           });
         }
       }
@@ -877,12 +881,18 @@
       const placements = placementsFor(counts, rides, avg, distId);
       return placements.reduce((s, p) => s + p.used, 0);
     }
+    // ridesCovered tolerates floating-point drift in the chronological-consume
+    // accumulator (e.g. 30 × (176/30) sums to 175.9999999997 in JS, not 176),
+    // which would otherwise flip ridesCovered down by one and falsely flag a
+    // fully-covered ride as PAYG overflow.
+    function ridesCovered(covered, avg) {
+      return avg > 0 ? Math.floor(covered / avg + 1e-6) : Infinity;
+    }
     function comboCost(rides, avg, counts, distId) {
       if (rides <= 0) return 0;
       if (comboTotalCount(counts) === 0) return rides * paygCost(avg);
       const covered = comboEffectiveCoverage(rides, avg, counts, distId);
-      const ridesInBundles = avg > 0 ? Math.floor(covered / avg) : Infinity;
-      const ridesOver = Math.max(0, rides - ridesInBundles);
+      const ridesOver = Math.max(0, rides - ridesCovered(covered, avg));
       return comboBundleCost(counts) + ridesOver * paygCost(avg);
     }
     function comboUnusedMinutes(rides, avg, counts, distId) {
@@ -908,8 +918,7 @@
       if (rides <= 0) return '—';
       if (comboTotalCount(counts) === 0) return 'No passes — all PAYG';
       const covered = comboEffectiveCoverage(rides, avg, counts, distId);
-      const ridesInBundles = avg > 0 ? Math.floor(covered / avg) : Infinity;
-      const ridesOver = Math.max(0, rides - ridesInBundles);
+      const ridesOver = Math.max(0, rides - ridesCovered(covered, avg));
       const label = comboLabel(counts);
       if (ridesOver === 0) return `${label} (covers all ${rides} rides)`;
       return `${label} + ${ridesOver} PAYG ride${ridesOver === 1 ? '' : 's'}`;
@@ -963,8 +972,7 @@
         const counts = [n0, n1, n2, n3];
         const placements = placeBundles(counts, dayMins);
         const covered = placements.reduce((s, p) => s + p.used, 0);
-        const ridesInBundles = avg > 0 ? Math.floor(covered / avg) : Infinity;
-        const ridesOver = Math.max(0, rides - ridesInBundles);
+        const ridesOver = Math.max(0, rides - ridesCovered(covered, avg));
         const cost = comboBundleCost(counts) + ridesOver * paygCost(avg);
         if (cost < best.cost - 0.005) best = { counts, cost };
       }
@@ -1331,6 +1339,25 @@
       const x = d => (d - 0.5) * colWidth;
       const colLeft = d => (d - 1) * colWidth;
 
+      // Diagonal-stripe patterns per bundle colour, used to indicate
+      // the part of a pass's validity window where the pass has been
+      // extinguished — minutes used up, but the window not yet expired.
+      const defs = svg.append('defs');
+      BUNDLE_TABS.forEach((tab, i) => {
+        const pat = defs.append('pattern')
+          .attr('id', `dist-hatch-b${i}`)
+          .attr('patternUnits', 'userSpaceOnUse')
+          .attr('width', 6).attr('height', 6)
+          .attr('patternTransform', 'rotate(45)');
+        pat.append('rect')
+          .attr('width', 6).attr('height', 6)
+          .attr('fill', tab.color).attr('opacity', 0.10);
+        pat.append('line')
+          .attr('x1', 0).attr('y1', 0).attr('x2', 0).attr('y2', 6)
+          .attr('stroke', tab.color).attr('stroke-width', 1.5)
+          .attr('opacity', 0.55);
+      });
+
       const g = svg.append('g').attr('transform', `translate(${M.left},${M.top})`);
 
       // Weekend column tints
@@ -1420,37 +1447,68 @@
           .attr('r', dotR)
           .attr('opacity', 0.95);
 
-        // Bundle bars — one row per placement, in greedy order.
+        // Bundle bars — one row per placement, in greedy order. Each
+        // placement is split into an "active" portion (solid colour, the
+        // days the bundle still has minutes left) and an optional
+        // "extinguished" portion (diagonal-stripe pattern, the rest of
+        // the validity window after the bundle ran out).
         const rowCount = Math.max(1, placements.length);
         const rowH = Math.max(4, (barsAreaH - 4) / rowCount);
-        const barData = placements.map((p, i) => ({
-          key: `b${p.idx}_${p.copy}_${p.start}`,
-          ...p,
-          row: i,
-          color: BUNDLE_TABS[p.idx].color,
-          label: BUNDLE_TABS[p.idx].label,
-        }));
+        const activeBars = [];
+        const extinctBars = [];
+        placements.forEach((p, i) => {
+          const endVis = Math.min(p.end, MONTH_DAYS);
+          const exhaust = p.exhaustedAt;
+          const activeEnd = exhaust !== null ? Math.min(exhaust, endVis) : endVis;
+          activeBars.push({
+            key: `b${p.idx}_${p.copy}_${p.start}_a`,
+            row: i, color: BUNDLE_TABS[p.idx].color, label: BUNDLE_TABS[p.idx].label,
+            start: p.start, end: activeEnd,
+          });
+          if (exhaust !== null && exhaust < endVis) {
+            extinctBars.push({
+              key: `b${p.idx}_${p.copy}_${p.start}_x`,
+              row: i, idx: p.idx, color: BUNDLE_TABS[p.idx].color,
+              start: exhaust + 1, end: endVis,
+            });
+          }
+        });
 
-        const bars = barsG.selectAll('rect.dist-bar').data(barData, d => d.key);
-        bars.exit()
-          .transition().duration(180)
-          .attr('opacity', 0)
-          .remove();
-        const barsEnter = bars.enter().append('rect')
-          .attr('class', 'dist-bar')
+        const aBars = barsG.selectAll('rect.dist-bar-active').data(activeBars, d => d.key);
+        aBars.exit().transition().duration(180).attr('opacity', 0).remove();
+        const aEnter = aBars.enter().append('rect')
+          .attr('class', 'dist-bar dist-bar-active')
           .attr('rx', 3).attr('ry', 3)
           .attr('opacity', 0);
-        barsEnter.merge(bars)
+        aEnter.merge(aBars)
           .attr('fill', d => d.color)
           .transition().duration(280).ease(d3.easeCubicOut)
           .attr('x', d => colLeft(d.start) + 1)
           .attr('y', d => barsAreaTop + d.row * (rowH + 1))
-          .attr('width', d => Math.max(0, colWidth * (Math.min(d.end, MONTH_DAYS) - d.start + 1) - 2))
+          .attr('width', d => Math.max(0, colWidth * (d.end - d.start + 1) - 2))
           .attr('height', rowH)
           .attr('opacity', 0.85);
 
-        // Inline labels on bars wide enough to fit them.
-        const barLabels = barsG.selectAll('text.dist-bar-label').data(barData, d => d.key);
+        const xBars = barsG.selectAll('rect.dist-bar-extinct').data(extinctBars, d => d.key);
+        xBars.exit().transition().duration(180).attr('opacity', 0).remove();
+        const xEnter = xBars.enter().append('rect')
+          .attr('class', 'dist-bar dist-bar-extinct')
+          .attr('rx', 3).attr('ry', 3)
+          .attr('opacity', 0);
+        xEnter.merge(xBars)
+          .attr('fill', d => `url(#dist-hatch-b${d.idx})`)
+          .attr('stroke', d => d.color)
+          .attr('stroke-width', 0.75)
+          .attr('stroke-opacity', 0.35)
+          .transition().duration(280).ease(d3.easeCubicOut)
+          .attr('x', d => colLeft(d.start) + 1)
+          .attr('y', d => barsAreaTop + d.row * (rowH + 1))
+          .attr('width', d => Math.max(0, colWidth * (d.end - d.start + 1) - 2))
+          .attr('height', rowH)
+          .attr('opacity', 0.85);
+
+        // Inline labels on the active portion only.
+        const barLabels = barsG.selectAll('text.dist-bar-label').data(activeBars, d => d.key);
         barLabels.exit().remove();
         const labelsEnter = barLabels.enter().append('text')
           .attr('class', 'dist-bar-label')
@@ -1461,7 +1519,7 @@
           .attr('x', d => colLeft(d.start) + 6)
           .attr('y', d => barsAreaTop + d.row * (rowH + 1) + rowH * 0.72)
           .attr('opacity', d => {
-            const widthPx = colWidth * (Math.min(d.end, MONTH_DAYS) - d.start + 1);
+            const widthPx = colWidth * (d.end - d.start + 1);
             return (widthPx >= 38 && rowH >= 11) ? 0.85 : 0;
           });
 
