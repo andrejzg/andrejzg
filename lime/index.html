@@ -824,38 +824,24 @@
       return placements;
     }
 
-    // Re-evaluate `used` for given placements at a different ride volume,
-    // using the same start days and same chronological-consumption rule.
-    function placementCoverage(placements, dayMins) {
-      const remaining = dayMins.slice();
-      let total = 0;
-      const out = [];
-      for (const p of placements) {
-        let used = 0;
-        for (let d = p.start; d <= p.end && d <= MONTH_DAYS && used < p.cap; d++) {
-          const take = Math.min(remaining[d - 1], p.cap - used);
-          remaining[d - 1] -= take;
-          used += take;
-        }
-        total += used;
-        out.push({ ...p, used });
-      }
-      return { total, placements: out };
+    // Placements DEPEND on (counts, distId, rides, avg) — chronological
+    // consumption shifts as bundles approach saturation, so a tiny
+    // reference volume mis-places (e.g. with 1 ride/day reference, a 30D
+    // bundle never fills its 400-min cap, leaves all days at 0, and
+    // prefer-LATER then sends the next 30D to a 1-day window). Recompute
+    // per call — cheap (~10ms across a chart redraw).
+    function placementsFor(counts, rides, avg, distId) {
+      return placeBundles(counts, dayMinsForDist(rides, avg, distId));
     }
 
-    // Placements depend only on (counts, distId) — dayMins shape is
-    // invariant under linear scaling by R or avg, so the optimal start
-    // days don't move when the slider does. Cache them.
-    let _placementCache = { key: null, placements: [] };
-    function getPlacements(counts, distId) {
-      const key = counts.join(',') + '|' + distId;
-      if (_placementCache.key === key) return _placementCache.placements;
-      const refMins = dayMinsForDist(MONTH_DAYS, 1, distId); // unit ride volume just for shape
-      const placed = placeBundles(counts, refMins).map(p => ({
-        idx: p.idx, copy: p.copy, start: p.start, end: p.end, cap: p.cap,
-      }));
-      _placementCache = { key, placements: placed };
-      return placed;
+    // Bundle types in placement order — used by passInfoAt where only
+    // the order matters, not the actual start days.
+    function placementOrder(counts) {
+      const out = [];
+      for (let i = 0; i < BUNDLES.length; i++) {
+        for (let n = 0; n < counts[i]; n++) out.push({ idx: i, copy: n });
+      }
+      return out;
     }
 
     // Per-ride bundle assignment for the dot chart. Iterates days in
@@ -864,7 +850,8 @@
     function assignRides(rides, avg, counts, distId) {
       if (rides <= 0) return [];
       const dayCounts = rideCountsPerDay(rides, distId);
-      const placements = getPlacements(counts, distId).map(p => ({ ...p, remaining: p.cap }));
+      const placements = placementsFor(counts, rides, avg, distId)
+        .map(p => ({ ...p, remaining: p.cap }));
       const out = [];
       for (let d = 1; d <= MONTH_DAYS; d++) {
         const cnt = dayCounts[d - 1];
@@ -887,9 +874,8 @@
     function comboEffectiveCoverage(rides, avg, counts, distId) {
       if (rides <= 0 || avg <= 0) return 0;
       if (comboTotalCount(counts) === 0) return 0;
-      const placements = getPlacements(counts, distId);
-      const dayMins = dayMinsForDist(rides, avg, distId);
-      return placementCoverage(placements, dayMins).total;
+      const placements = placementsFor(counts, rides, avg, distId);
+      return placements.reduce((s, p) => s + p.used, 0);
     }
     function comboCost(rides, avg, counts, distId) {
       if (rides <= 0) return 0;
@@ -946,10 +932,10 @@
       if (comboCost(r, avg, counts, distId) > comboBundleCost(counts) + 1e-6) {
         return { idx: -1, copy: 0, color: COLORS.payg, key: 'payg' };
       }
-      const placements = getPlacements(counts, distId);
+      const order = placementOrder(counts);
       const totalMins = r * avg;
       let cumMins = 0;
-      for (const p of placements) {
+      for (const p of order) {
         cumMins += BUNDLES[p.idx].mins;
         if (totalMins <= cumMins + 1e-9) {
           return { idx: p.idx, copy: p.copy, color: BUNDLE_TABS[p.idx].color, key: `b${p.idx}_${p.copy}` };
@@ -1397,7 +1383,7 @@
 
       function render(rides, avg, counts, distId) {
         const dayCounts = rideCountsPerDay(rides, distId);
-        const placements = getPlacements(counts, distId);
+        const placements = placementsFor(counts, rides, avg, distId);
         const assignments = assignRides(rides, avg, counts, distId);
 
         // Slot indices for stacking dots within each day column.
