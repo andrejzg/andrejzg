@@ -965,14 +965,36 @@
       });
       let best = { counts: [0, 0, 0, 0], cost: rides * paygCost(avg) };
       const dayMins = dayMinsForDist(rides, avg, distId);
+      const dayCounts = rideCountsPerDay(rides, distId);
+      // Score each combo with the same discrete ride-fit as assignRides:
+      // each ride needs ≥avg minutes left in ONE bundle, so a bundle with
+      // (avg-1) trailing minutes can't take another ride. Continuous
+      // covered/avg misses that and overpays for finely-fitted stacks.
       for (let n0 = 0; n0 <= caps[0]; n0++)
       for (let n1 = 0; n1 <= caps[1]; n1++)
       for (let n2 = 0; n2 <= caps[2]; n2++)
       for (let n3 = 0; n3 <= caps[3]; n3++) {
         const counts = [n0, n1, n2, n3];
         const placements = placeBundles(counts, dayMins);
-        const covered = placements.reduce((s, p) => s + p.used, 0);
-        const ridesOver = Math.max(0, rides - ridesCovered(covered, avg));
+        const remaining = placements.map(p => p.cap);
+        let ridesOver = 0;
+        for (let d = 1; d <= MONTH_DAYS; d++) {
+          const cnt = dayCounts[d - 1];
+          for (let n = 0; n < cnt; n++) {
+            let chosenIdx = -1, chosenEnd = Infinity, chosenMins = Infinity;
+            for (let pi = 0; pi < placements.length; pi++) {
+              const p = placements[pi];
+              if (p.start <= d && p.end >= d && remaining[pi] >= avg - 1e-9) {
+                const bm = BUNDLES[p.idx].mins;
+                if (p.end < chosenEnd || (p.end === chosenEnd && bm < chosenMins)) {
+                  chosenIdx = pi; chosenEnd = p.end; chosenMins = bm;
+                }
+              }
+            }
+            if (chosenIdx >= 0) remaining[chosenIdx] -= avg;
+            else ridesOver++;
+          }
+        }
         const cost = comboBundleCost(counts) + ridesOver * paygCost(avg);
         if (cost < best.cost - 0.005) best = { counts, cost };
       }
