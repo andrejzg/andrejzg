@@ -51,7 +51,7 @@
         radial-gradient(900px 500px at -10% 30%, rgba(213,230,240,0.45), transparent 60%),
         var(--bg);
       min-height: 100vh;
-      padding: 28px 18px 80px;
+      padding: 18px 18px 80px;
     }
     .wrap {
       max-width: 920px;
@@ -62,7 +62,7 @@
       align-items: center;
       justify-content: space-between;
       gap: 16px;
-      margin-bottom: 28px;
+      margin-bottom: 18px;
     }
     .brand {
       display: flex;
@@ -91,11 +91,11 @@
     nav a:hover { color: var(--text); background: var(--bg-soft); }
 
     h1 {
-      font-size: clamp(34px, 7vw, 56px);
-      line-height: 1.02;
-      letter-spacing: -0.03em;
+      font-size: clamp(26px, 4.5vw, 38px);
+      line-height: 1.05;
+      letter-spacing: -0.02em;
       font-weight: 600;
-      margin: 18px 0 10px;
+      margin: 6px 0 6px;
     }
     h1 em {
       font-style: normal;
@@ -103,9 +103,9 @@
     }
     .lede {
       color: var(--text-dim);
-      font-size: clamp(15px, 2.4vw, 17px);
+      font-size: 14px;
       max-width: 60ch;
-      margin: 0 0 28px;
+      margin: 0 0 16px;
     }
 
     .card {
@@ -748,7 +748,7 @@
     </header>
 
     <h1>How much does a <em>Lime</em> ride actually cost in London?</h1>
-    <p class="lede">An interactive look at the four ways to pay — PAYG, LimePrime, and the four LimePass minute bundles — and when each one wins.</p>
+    <p class="lede">PAYG vs LimePrime vs LimePass minute bundles — for your usage.</p>
 
     <!-- Plans overview · hidden — we now auto-pick the optimal stack
          and surface the comparison in the results table below. Keep in
@@ -792,7 +792,6 @@
     <!-- Monthly cost vs usage -->
     <section class="card">
       <h2>Your monthly cost</h2>
-      <h3>The cheapest stack for your usage, next to PAYG and LimePrime.</h3>
 
       <div class="mode-tabs" role="tablist" aria-label="Ride pattern source">
         <span class="mode-label">Pattern</span>
