@@ -360,119 +360,6 @@
     }
     .notes a { color: var(--text-dim); }
 
-    /* Bundle tabs */
-    .bundle-tabs {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 6px;
-      margin-bottom: 10px;
-    }
-    .bundle-tab {
-      background: var(--bg-soft);
-      border: 1px solid var(--line);
-      border-radius: var(--radius-sm);
-      padding: 10px 6px 6px;
-      font-family: inherit;
-      text-align: center;
-      transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
-      color: var(--text-dim);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 2px;
-      -webkit-tap-highlight-color: transparent;
-    }
-    .bundle-tab .bt-top {
-      font-size: 15px;
-      font-weight: 600;
-      color: var(--text);
-      letter-spacing: -0.01em;
-    }
-    .bundle-tab .bt-bot {
-      font-size: 11px;
-      color: var(--text-faint);
-      font-variant-numeric: tabular-nums;
-    }
-    .bundle-tab.active {
-      background: #fff;
-      border-color: var(--bt-color, var(--text-dim));
-      box-shadow: inset 0 -3px 0 var(--bt-color, var(--text-dim));
-    }
-    .bundle-tab.active .bt-top { color: var(--bt-color, var(--text)); }
-    .bundle-tab .bt-counter {
-      margin-top: 6px;
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      font-variant-numeric: tabular-nums;
-    }
-    .bundle-tab .bt-btn {
-      width: 22px;
-      height: 22px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: 999px;
-      border: 1px solid var(--line);
-      background: #fff;
-      color: var(--text-dim);
-      font-size: 14px;
-      font-weight: 600;
-      line-height: 1;
-      cursor: pointer;
-      padding: 0;
-      font-family: inherit;
-      transition: background 0.1s, border-color 0.1s, color 0.1s;
-      -webkit-tap-highlight-color: transparent;
-    }
-    .bundle-tab .bt-btn:hover:not(:disabled) {
-      background: var(--bt-color, var(--text-dim));
-      color: #fff;
-      border-color: var(--bt-color, var(--text-dim));
-    }
-    .bundle-tab .bt-btn:disabled { opacity: 0.35; cursor: default; }
-    .bundle-tab .bt-count {
-      min-width: 18px;
-      text-align: center;
-      font-weight: 600;
-      color: var(--text);
-      font-size: 14px;
-    }
-    .bundle-tab.active .bt-count { color: var(--bt-color, var(--text)); }
-
-    .bundle-actions {
-      display: flex;
-      justify-content: flex-end;
-      gap: 8px;
-      margin-bottom: 14px;
-    }
-    .bundle-action {
-      background: #fff;
-      border: 1px solid var(--line);
-      border-radius: var(--radius-sm);
-      padding: 6px 12px;
-      font-family: inherit;
-      font-size: 13px;
-      cursor: pointer;
-      color: var(--text);
-      transition: background 0.1s, border-color 0.1s;
-      -webkit-tap-highlight-color: transparent;
-    }
-    .bundle-action:hover { background: var(--bg-soft); border-color: var(--text-faint); }
-    .bundle-action.primary {
-      background: var(--lime-soft);
-      border-color: rgba(130,168,56,0.4);
-      color: #4a6b1f;
-      font-weight: 500;
-    }
-    .bundle-action.primary:hover { background: #dfeebd; }
-    @media (max-width: 480px) {
-      .bundle-tab { padding: 8px 2px 6px; }
-      .bundle-tab .bt-bot { font-size: 10px; }
-      .bundle-tab .bt-btn { width: 20px; height: 20px; font-size: 13px; }
-      .bundle-tab .bt-counter { gap: 2px; }
-    }
-
     /* Distribution chart */
     .dist-tabs {
       display: flex;
@@ -901,16 +788,6 @@
     <section class="card">
       <h2>Your monthly cost</h2>
       <h3>We auto-pick the cheapest LimePass stack for your usage, and show it next to PAYG and LimePrime.</h3>
-
-      <!-- Manual bundle selection retired — `Find optimal combo` runs
-           automatically whenever inputs change. Markup kept hidden so
-           the optimizer's render hooks (refreshPassVisuals, updateTabUi)
-           still find their elements as no-ops. -->
-      <div class="bundle-tabs" aria-label="LimePass bundles" hidden></div>
-      <div class="bundle-actions" hidden>
-        <button type="button" class="bundle-action" id="passes-clear">Clear</button>
-        <button type="button" class="bundle-action primary" id="passes-optimal">Find optimal combo</button>
-      </div>
 
       <div class="mode-tabs" role="tablist" aria-label="Ride pattern source">
         <span class="mode-label">Pattern</span>
@@ -2074,7 +1951,6 @@
       if (passCounts.length === optimal.length && passCounts.every((c, i) => c === optimal[i])) return;
       passCounts = optimal.slice();
       monthly.refreshPassVisuals();
-      updateTabUi();
     }
     function readInputs() {
       const avg = +document.getElementById('avg').value;
@@ -2464,61 +2340,6 @@
     if (hasCustomData) {
       setTimeout(() => setMode('custom'), 0);
     }
-
-    // Bundle counter cards + actions
-    function setPassCounts(newCounts) {
-      passCounts = newCounts.slice();
-      monthly.refreshPassVisuals();
-      updateTabUi();
-      currentAvg = null; // force line recompute on next readInputs
-      readInputs();
-    }
-    function updateTabUi() {
-      document.querySelectorAll('.bundle-tab').forEach((card, i) => {
-        const count = passCounts[i];
-        card.classList.toggle('active', count > 0);
-        card.querySelector('.bt-count').textContent = count;
-        card.querySelector('.bt-minus').disabled = count === 0;
-      });
-    }
-    (function renderTabs() {
-      const container = document.querySelector('.bundle-tabs');
-      BUNDLE_TABS.forEach((tab, i) => {
-        const b = BUNDLES[i];
-        const card = document.createElement('div');
-        card.className = 'bundle-tab' + (passCounts[i] > 0 ? ' active' : '');
-        card.style.setProperty('--bt-color', tab.color);
-        card.innerHTML = `
-          <span class="bt-top">${tab.label}</span>
-          <span class="bt-bot">${b.mins}m · £${b.price.toFixed(2)}</span>
-          <span class="bt-counter">
-            <button type="button" class="bt-btn bt-minus" aria-label="Remove a ${tab.label} pass"${passCounts[i] === 0 ? ' disabled' : ''}>−</button>
-            <span class="bt-count">${passCounts[i]}</span>
-            <button type="button" class="bt-btn bt-plus" aria-label="Add a ${tab.label} pass">+</button>
-          </span>`;
-        card.querySelector('.bt-plus').addEventListener('click', () => {
-          const next = passCounts.slice();
-          next[i] = next[i] + 1;
-          setPassCounts(next);
-        });
-        card.querySelector('.bt-minus').addEventListener('click', () => {
-          if (passCounts[i] <= 0) return;
-          const next = passCounts.slice();
-          next[i] = next[i] - 1;
-          setPassCounts(next);
-        });
-        container.appendChild(card);
-      });
-    })();
-
-    document.getElementById('passes-clear').addEventListener('click', () => {
-      setPassCounts([0, 0, 0, 0]);
-    });
-    document.getElementById('passes-optimal').addEventListener('click', () => {
-      const rpm = effectiveRpm();
-      const avg = +document.getElementById('avg').value;
-      setPassCounts(findOptimalCounts(rpm, avg, currentDist));
-    });
 
     readInputs();
   })();
