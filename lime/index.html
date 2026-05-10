@@ -718,6 +718,119 @@
       .stepper-day-label { font-size: 12px; }
     }
 
+    /* Month picker — drill-down: year grid → month grid */
+    .card-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .card-header > .card-title { flex: 1 1 auto; min-width: 0; }
+    .card-header > .card-title h2,
+    .card-header > .card-title h3 { margin: 0 0 6px; }
+    .card-header > .card-title h3 { margin-bottom: 0; }
+
+    .month-picker { position: relative; flex-shrink: 0; }
+    .month-picker-btn {
+      background: var(--bg-card);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+      padding: 8px 12px;
+      font-family: inherit;
+      font-size: 14px;
+      color: var(--text);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-variant-numeric: tabular-nums;
+      -webkit-tap-highlight-color: transparent;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .month-picker-btn:hover { background: var(--bg-soft); border-color: var(--text-faint); }
+    .month-picker-btn .caret {
+      font-size: 10px;
+      color: var(--text-faint);
+      margin-left: 2px;
+      transition: transform 0.15s;
+    }
+    .month-picker[data-open="true"] .month-picker-btn .caret { transform: rotate(180deg); }
+    .month-picker-pop {
+      position: absolute;
+      top: calc(100% + 6px);
+      right: 0;
+      width: 256px;
+      background: var(--bg-card);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+      box-shadow: var(--shadow);
+      padding: 12px;
+      z-index: 100;
+    }
+    .month-picker-pop[hidden] { display: none; }
+    .month-picker-head {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 8px;
+      font-size: 13px;
+      color: var(--text);
+      font-weight: 500;
+    }
+    .month-picker-back {
+      width: 28px; height: 28px;
+      border-radius: 6px;
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--text-dim);
+      cursor: pointer;
+      font-size: 16px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .month-picker-back:hover { background: var(--bg-soft); border-color: var(--line); color: var(--text); }
+    .month-picker-back[disabled] { opacity: 0; pointer-events: none; }
+    .month-picker-title { flex: 1 1 auto; text-align: center; }
+    .month-picker-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+    }
+    .month-picker-cell {
+      padding: 12px 6px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+      background: var(--bg-card);
+      color: var(--text);
+      font-family: inherit;
+      font-size: 13px;
+      cursor: pointer;
+      font-variant-numeric: tabular-nums;
+      text-align: center;
+      -webkit-tap-highlight-color: transparent;
+      transition: background 0.12s, border-color 0.12s;
+    }
+    .month-picker-cell:hover { background: var(--bg-soft); }
+    .month-picker-cell.current {
+      border-color: var(--lime);
+      color: var(--lime);
+      font-weight: 600;
+    }
+    .month-picker-cell.selected {
+      background: var(--text);
+      color: #fff;
+      border-color: var(--text);
+    }
+    @media (max-width: 560px) {
+      .month-picker-pop {
+        width: 240px;
+        right: -8px;
+      }
+      .month-picker-cell { padding: 14px 4px; font-size: 13px; }
+    }
+
     footer {
       margin-top: 40px;
       color: var(--text-faint);
@@ -833,8 +946,25 @@
 
     <!-- Ride distribution across the month -->
     <section class="card">
-      <h2>Where your rides land in the month</h2>
-      <h3>Pick a pattern; passes attach to the days that maximise coverage.</h3>
+      <div class="card-header">
+        <div class="card-title">
+          <h2>Where your rides land in the month</h2>
+          <h3>Pick a pattern; passes attach to the days that maximise coverage.</h3>
+        </div>
+        <div class="month-picker" id="month-picker" data-open="false">
+          <button type="button" class="month-picker-btn" id="month-picker-btn" aria-haspopup="true" aria-expanded="false">
+            <span id="month-picker-label">May 2026</span>
+            <span class="caret" aria-hidden="true">▾</span>
+          </button>
+          <div class="month-picker-pop" id="month-picker-pop" hidden role="dialog" aria-label="Pick month">
+            <div class="month-picker-head">
+              <button type="button" class="month-picker-back" id="month-picker-back" aria-label="Back to years" disabled>‹</button>
+              <div class="month-picker-title" id="month-picker-title">Year</div>
+            </div>
+            <div class="month-picker-grid" id="month-picker-grid"></div>
+          </div>
+        </div>
+      </div>
 
       <div class="dist-tabs" role="tablist" aria-label="Ride distribution"></div>
 
@@ -905,9 +1035,24 @@
     // ride-minutes inside its v-day window. Each ride is then assigned
     // to whichever active bundle expires soonest; whatever doesn't fit
     // is PAYG.
-    const MONTH_DAYS = 30;
+    // Calendar context. `MONTH_DAYS` and `dayOfWeek` used to be a flat
+    // 30-day model. Now they reflect the picker's selected month, so
+    // e.g. Feb 2027 has 28 days starting Mon and May 2026 has 31 days
+    // starting Fri. The cost analysis itself is date-independent — only
+    // the layout, weekend mask, and total capacity change with month.
+    const today = new Date();
+    let currentYear  = today.getFullYear();
+    let currentMonth = today.getMonth() + 1; // 1..12
+    function monthDaysOf(year, month) {
+      return new Date(year, month, 0).getDate();
+    }
+    // JS getDay(): 0=Sun..6=Sat. Convert to our 0=Mon..6=Sun.
+    function dayOfWeekFor(year, month, day) {
+      return (new Date(year, month - 1, day).getDay() + 6) % 7;
+    }
+    let MONTH_DAYS = monthDaysOf(currentYear, currentMonth);
     const WEEK_LEN = 7;
-    function dayOfWeek(d) { return ((d - 1) % WEEK_LEN); } // 0 = Mon … 6 = Sun
+    function dayOfWeek(d) { return dayOfWeekFor(currentYear, currentMonth, d); }
     function isWeekday(d) { return dayOfWeek(d) < 5; }
     function isWeekend(d) { return dayOfWeek(d) >= 5; }
 
@@ -1578,7 +1723,11 @@
       const dotsAreaH = ih * 0.66;
       const barsAreaTop = dotsAreaH + 10;
       const barsAreaH  = ih - barsAreaTop;
-      const colWidth = iw / MONTH_DAYS;
+      // colWidth / x / colLeft depend on MONTH_DAYS, which is dynamic
+      // (changes when the month picker swaps months). Arrow functions
+      // capture these by reference, so reassigning in layoutCalendar()
+      // propagates everywhere they're used.
+      let colWidth = iw / MONTH_DAYS;
       const x = d => (d - 0.5) * colWidth;
       const colLeft = d => (d - 1) * colWidth;
 
@@ -1603,35 +1752,17 @@
 
       const g = svg.append('g').attr('transform', `translate(${M.left},${M.top})`);
 
-      // Weekend column tints
-      const weekendDays = [];
-      for (let d = 1; d <= MONTH_DAYS; d++) if (isWeekend(d)) weekendDays.push(d);
-      g.append('g').attr('class', 'dist-weekends')
-        .selectAll('rect').data(weekendDays).enter().append('rect')
-        .attr('x', d => colLeft(d))
-        .attr('y', 0)
-        .attr('width', colWidth)
-        .attr('height', ih)
-        .attr('fill', 'rgba(108, 105, 87, 0.05)');
-
-      // Week-start dashed dividers
+      const weekendsG = g.append('g').attr('class', 'dist-weekends');
       const dividerG = g.append('g').attr('class', 'dist-dividers');
-      [8, 15, 22, 29].forEach(d => {
-        if (d > MONTH_DAYS) return;
-        dividerG.append('line')
-          .attr('class', 'dist-week-divider')
-          .attr('x1', colLeft(d)).attr('x2', colLeft(d))
-          .attr('y1', 0).attr('y2', ih);
-      });
 
       // Baseline at the bottom of the dots area
       g.append('line').attr('class', 'dist-baseline')
         .attr('x1', 0).attr('x2', iw)
         .attr('y1', dotsAreaH).attr('y2', dotsAreaH);
 
-      // Render groups (z-order). Hit-rects go BELOW everything so the
-      // dots/bars render on top, but they catch clicks per day column
-      // when Custom mode is active.
+      // Render groups (z-order). Hit-rect goes BELOW everything so the
+      // dots/bars render on top, but it catches clicks anywhere in the
+      // chart area when Custom mode is active.
       const hitsG = g.append('g').attr('class', 'dist-hits');
       const selectG = g.append('g').attr('class', 'dist-select');
       const ridesG = g.append('g').attr('class', 'dist-rides');
@@ -1642,7 +1773,7 @@
 
       // One invisible hit rect spanning the whole chart area. We snap
       // the click's x-coordinate to the nearest day column rather than
-      // building 30 narrow hit-rects — on mobile each column is only
+      // building N narrow hit-rects — on mobile each column is only
       // ~12px wide, so snap-to-nearest is more forgiving.
       hitsG.attr('pointer-events', 'none');
       hitsG.append('rect')
@@ -1650,7 +1781,6 @@
         .attr('x', 0).attr('y', -4)
         .attr('width', iw).attr('height', ih + 8)
         .on('click', function(event) {
-          // Map x to day in the local g coordinate space.
           const pt = d3.pointer(event, g.node());
           const localX = pt[0];
           if (localX < 0 || localX > iw) return;
@@ -1658,21 +1788,60 @@
           onDayClick(d);
         });
 
-      const daysList = Array.from({ length: MONTH_DAYS }, (_, i) => i + 1);
-      labelsG.selectAll('text.dist-day-dow').data(daysList).enter().append('text')
-        .attr('class', 'dist-day-dow')
-        .attr('x', d => x(d))
-        .attr('y', 12)
-        .attr('text-anchor', 'middle')
-        .attr('fill', d => isWeekend(d) ? 'var(--text-faint)' : 'var(--text-dim)')
-        .text(d => 'MTWTFSS'[dayOfWeek(d)]);
-      labelsG.selectAll('text.dist-day-num').data(daysList).enter().append('text')
-        .attr('class', 'dist-day-num')
-        .attr('x', d => x(d))
-        .attr('y', 28)
-        .attr('text-anchor', 'middle')
-        .attr('fill', 'var(--text-faint)')
-        .text(d => (d === 1 || d % 5 === 0 || d === MONTH_DAYS) ? d : '');
+      // Re-renders the per-month static layout: weekend tints, week
+      // dividers between Sun→Mon transitions, and the day-of-week +
+      // date labels under each column. Called from init AND every time
+      // the picker swaps months.
+      function layoutCalendar() {
+        colWidth = iw / MONTH_DAYS;
+
+        const weekendDays = [];
+        for (let d = 1; d <= MONTH_DAYS; d++) if (isWeekend(d)) weekendDays.push(d);
+        const wkRects = weekendsG.selectAll('rect').data(weekendDays, d => d);
+        wkRects.exit().remove();
+        wkRects.enter().append('rect')
+          .attr('fill', 'rgba(108, 105, 87, 0.05)')
+          .merge(wkRects)
+          .attr('x', d => colLeft(d))
+          .attr('y', 0)
+          .attr('width', colWidth)
+          .attr('height', ih);
+
+        // Dashed dividers wherever a Monday starts inside the month
+        // (skip day 1 — no divider before the first column).
+        const dividers = [];
+        for (let d = 2; d <= MONTH_DAYS; d++) if (dayOfWeek(d) === 0) dividers.push(d);
+        const divLines = dividerG.selectAll('line').data(dividers, d => d);
+        divLines.exit().remove();
+        divLines.enter().append('line')
+          .attr('class', 'dist-week-divider')
+          .merge(divLines)
+          .attr('x1', d => colLeft(d)).attr('x2', d => colLeft(d))
+          .attr('y1', 0).attr('y2', ih);
+
+        const daysList = Array.from({ length: MONTH_DAYS }, (_, i) => i + 1);
+        const dows = labelsG.selectAll('text.dist-day-dow').data(daysList, d => d);
+        dows.exit().remove();
+        dows.enter().append('text')
+          .attr('class', 'dist-day-dow')
+          .attr('y', 12)
+          .attr('text-anchor', 'middle')
+          .merge(dows)
+          .attr('x', d => x(d))
+          .attr('fill', d => isWeekend(d) ? 'var(--text-faint)' : 'var(--text-dim)')
+          .text(d => 'MTWTFSS'[dayOfWeek(d)]);
+        const nums = labelsG.selectAll('text.dist-day-num').data(daysList, d => d);
+        nums.exit().remove();
+        nums.enter().append('text')
+          .attr('class', 'dist-day-num')
+          .attr('y', 28)
+          .attr('text-anchor', 'middle')
+          .attr('fill', 'var(--text-faint)')
+          .merge(nums)
+          .attr('x', d => x(d))
+          .text(d => (d === 1 || d % 5 === 0 || d === MONTH_DAYS) ? d : '');
+      }
+      layoutCalendar();
 
       function render(rides, avg, counts, distId) {
         const dayCounts = rideCountsPerDay(rides, distId);
@@ -1863,7 +2032,7 @@
         hitsG.attr('pointer-events', on ? 'auto' : 'none');
       }
 
-      return { render, setSelected, setEditable };
+      return { render, setSelected, setEditable, layoutCalendar };
     })();
 
     let currentAvg = null;
@@ -1922,31 +2091,75 @@
     })();
 
     // === Custom-mode state, persistence, and UI =====================
-    // Source of truth: customCounts[]. Slider becomes derived sum.
-    const LS_KEY = 'lime-custom-counts-v1';
+    // Source of truth: customCounts[] for the currently-selected month.
+    // Per-month storage: customStore is keyed by "YYYY-MM" so flipping
+    // between months is lossless. Slider becomes derived sum.
+    const LS_KEY = 'lime-custom-counts-v2';      // { "2026-05": [counts...], ... }
+    const LS_MONTH = 'lime-current-month-v1';     // "2026-05"
+    const LS_KEY_V1 = 'lime-custom-counts-v1';   // flat array, migrated
     let selectedDay = null;
     const undoStack = []; // snapshots of customCounts, capped
     const UNDO_CAP = 20;
     let saveTimer = null;
+    let customStore = {};
+    function monthKey(y, m) { return `${y}-${String(m).padStart(2, '0')}`; }
     function saveCustomDebounced() {
+      customStore[monthKey(currentYear, currentMonth)] = customCounts.slice();
       if (saveTimer) clearTimeout(saveTimer);
       saveTimer = setTimeout(() => {
-        try { localStorage.setItem(LS_KEY, JSON.stringify(customCounts)); }
-        catch (e) { /* private mode, quota, etc. — silently skip */ }
+        try {
+          localStorage.setItem(LS_KEY, JSON.stringify(customStore));
+          localStorage.setItem(LS_MONTH, monthKey(currentYear, currentMonth));
+        } catch (e) { /* private mode, quota, etc. — silently skip */ }
       }, 500);
     }
     function loadCustomFromStorage() {
+      // Hydrate the per-month store, plus restore the last-viewed month
+      // if any. Migrates a v1 flat array into the current month's slot
+      // so users coming from the previous build don't lose their work.
       try {
         const raw = localStorage.getItem(LS_KEY);
-        if (!raw) return false;
-        const parsed = JSON.parse(raw);
-        if (!Array.isArray(parsed) || parsed.length !== MONTH_DAYS) return false;
-        for (let i = 0; i < MONTH_DAYS; i++) {
-          const v = Math.max(0, Math.floor(+parsed[i] || 0));
-          customCounts[i] = v;
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+            customStore = parsed;
+          }
         }
-        return customCounts.some(c => c > 0);
-      } catch (e) { return false; }
+      } catch (e) { customStore = {}; }
+      // v1 migration
+      try {
+        const v1 = localStorage.getItem(LS_KEY_V1);
+        if (v1) {
+          const arr = JSON.parse(v1);
+          if (Array.isArray(arr) && !customStore[monthKey(currentYear, currentMonth)]) {
+            customStore[monthKey(currentYear, currentMonth)] = arr;
+          }
+          localStorage.removeItem(LS_KEY_V1);
+        }
+      } catch (e) { /* skip */ }
+      // Restore last-viewed month
+      try {
+        const saved = localStorage.getItem(LS_MONTH);
+        if (saved) {
+          const [ys, ms] = saved.split('-');
+          const y = +ys, m = +ms;
+          if (y >= 1970 && y <= 9999 && m >= 1 && m <= 12) {
+            currentYear = y;
+            currentMonth = m;
+            MONTH_DAYS = monthDaysOf(y, m);
+          }
+        }
+      } catch (e) { /* skip */ }
+      // Hydrate customCounts for the resolved month
+      const key = monthKey(currentYear, currentMonth);
+      const stored = customStore[key];
+      customCounts = new Array(MONTH_DAYS).fill(0);
+      if (Array.isArray(stored)) {
+        for (let i = 0; i < Math.min(MONTH_DAYS, stored.length); i++) {
+          customCounts[i] = Math.max(0, Math.floor(+stored[i] || 0));
+        }
+      }
+      return customCounts.some(c => c > 0);
     }
     function snapshotForUndo() {
       undoStack.push(customCounts.slice());
@@ -2068,11 +2281,132 @@
     document.getElementById('stepper-undo').addEventListener('click', undoLast);
     document.getElementById('stepper-close').addEventListener('click', closeStepper);
     document.getElementById('custom-reset').addEventListener('click', resetToPreset);
-    // Restore from localStorage on load. If the user had a saved custom
-    // pattern, default into Custom mode so their work is visible right
-    // away. Otherwise stay on the Preset default.
-    if (loadCustomFromStorage()) {
-      // Defer to next tick so the dist module is fully wired first.
+
+    // === Month picker ==============================================
+    const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const MONTH_NAMES_LONG = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    let pickerView = 'year';       // 'year' | 'month'
+    let pickerYearScroll = today.getFullYear(); // centers the year grid
+    let pickerSelectedYear = currentYear;
+    function updateMonthButton() {
+      document.getElementById('month-picker-label').textContent =
+        `${MONTH_NAMES_LONG[currentMonth - 1]} ${currentYear}`;
+    }
+    function renderPickerGrid() {
+      const grid = document.getElementById('month-picker-grid');
+      const title = document.getElementById('month-picker-title');
+      const back = document.getElementById('month-picker-back');
+      grid.innerHTML = '';
+      if (pickerView === 'year') {
+        title.textContent = 'Year';
+        back.disabled = true;
+        // 12 years, centered on pickerYearScroll
+        const start = pickerYearScroll - 5;
+        for (let i = 0; i < 12; i++) {
+          const y = start + i;
+          const cell = document.createElement('button');
+          cell.type = 'button';
+          cell.className = 'month-picker-cell';
+          if (y === currentYear) cell.classList.add('current');
+          if (y === pickerSelectedYear) cell.classList.add('selected');
+          cell.textContent = y;
+          cell.addEventListener('click', () => {
+            pickerSelectedYear = y;
+            pickerView = 'month';
+            renderPickerGrid();
+          });
+          grid.appendChild(cell);
+        }
+      } else {
+        title.textContent = String(pickerSelectedYear);
+        back.disabled = false;
+        for (let m = 1; m <= 12; m++) {
+          const cell = document.createElement('button');
+          cell.type = 'button';
+          cell.className = 'month-picker-cell';
+          if (pickerSelectedYear === currentYear && m === currentMonth) cell.classList.add('current');
+          cell.textContent = MONTH_NAMES[m - 1];
+          cell.addEventListener('click', () => {
+            setMonth(pickerSelectedYear, m);
+            closeMonthPicker();
+          });
+          grid.appendChild(cell);
+        }
+      }
+    }
+    function openMonthPicker() {
+      pickerSelectedYear = currentYear;
+      pickerYearScroll = currentYear;
+      pickerView = 'year';
+      renderPickerGrid();
+      document.getElementById('month-picker-pop').hidden = false;
+      document.getElementById('month-picker').dataset.open = 'true';
+      document.getElementById('month-picker-btn').setAttribute('aria-expanded', 'true');
+    }
+    function closeMonthPicker() {
+      document.getElementById('month-picker-pop').hidden = true;
+      document.getElementById('month-picker').dataset.open = 'false';
+      document.getElementById('month-picker-btn').setAttribute('aria-expanded', 'false');
+    }
+    function setMonth(year, month) {
+      if (year === currentYear && month === currentMonth) return;
+      // Stash the current month's custom counts before switching, so a
+      // user editing May and flipping to June then back to May finds
+      // their May dots intact.
+      customStore[monthKey(currentYear, currentMonth)] = customCounts.slice();
+      currentYear = year;
+      currentMonth = month;
+      MONTH_DAYS = monthDaysOf(year, month);
+      // Hydrate new month's customCounts (zeros if not stored yet).
+      const stored = customStore[monthKey(year, month)];
+      customCounts = new Array(MONTH_DAYS).fill(0);
+      if (Array.isArray(stored)) {
+        for (let i = 0; i < Math.min(MONTH_DAYS, stored.length); i++) {
+          customCounts[i] = Math.max(0, Math.floor(+stored[i] || 0));
+        }
+      }
+      undoStack.length = 0; // undo is conceptually per-month
+      closeStepper();
+      saveCustomDebounced();
+      dist.layoutCalendar();
+      updateMonthButton();
+      // Re-run optimizer for the new calendar (weekend mask shifts,
+      // month length changes, custom counts may differ). The current
+      // currentAvg cache is also stale because viewMax depends on rpm.
+      currentAvg = null;
+      const rpm = effectiveRpm();
+      const avg = +document.getElementById('avg').value;
+      setPassCounts(findOptimalCounts(rpm, avg, currentDist));
+    }
+    document.getElementById('month-picker-btn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      const open = document.getElementById('month-picker').dataset.open === 'true';
+      if (open) closeMonthPicker(); else openMonthPicker();
+    });
+    document.getElementById('month-picker-back').addEventListener('click', () => {
+      pickerView = 'year';
+      renderPickerGrid();
+    });
+    // Outside-tap dismiss + Esc dismiss.
+    document.addEventListener('click', (e) => {
+      if (document.getElementById('month-picker').dataset.open !== 'true') return;
+      if (!document.getElementById('month-picker').contains(e.target)) closeMonthPicker();
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && document.getElementById('month-picker').dataset.open === 'true') {
+        closeMonthPicker();
+      }
+    });
+    updateMonthButton();
+
+    // Restore from localStorage on load. loadCustomFromStorage may
+    // change the current month even if no custom counts exist, so
+    // re-layout regardless. If non-zero custom counts were restored,
+    // also boot into Custom mode so the user's work is visible.
+    const hasCustomData = loadCustomFromStorage();
+    updateMonthButton();
+    dist.layoutCalendar();
+    if (hasCustomData) {
       setTimeout(() => setMode('custom'), 0);
     }
 
