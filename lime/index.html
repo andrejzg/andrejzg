@@ -310,13 +310,15 @@
     .results .name { color: var(--text); }
     .results .sub { color: var(--text-faint); font-size: 12px; margin-left: 14px; display: block; }
 
-    /* Monthly calculator — compact: label + value on one row, slider on the next */
+    /* Monthly calculator — compact: label + value on one row, slider on the next.
+       At 520px and below the columns stack so the labels don't wrap into the
+       value on phones (iPhone 14 Pro Max is 430px wide). */
     .calc-grid {
       display: grid;
       gap: 10px;
       grid-template-columns: 1fr 1fr;
     }
-    @media (max-width: 400px) { .calc-grid { grid-template-columns: 1fr; } }
+    @media (max-width: 520px) { .calc-grid { grid-template-columns: 1fr; } }
     .field {
       background: var(--bg-soft);
       border: 1px solid var(--line);
