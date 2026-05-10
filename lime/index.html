@@ -554,6 +554,170 @@
       .dist-day-dow { display: none; }
     }
 
+    /* Pattern source: Preset vs Custom mode */
+    .mode-tabs {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      margin: 0 0 10px;
+      flex-wrap: wrap;
+    }
+    .mode-tabs .mode-label {
+      font-size: 11px;
+      color: var(--text-faint);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-right: 4px;
+    }
+    .mode-tab {
+      background: var(--bg-card);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 5px 12px;
+      font-family: inherit;
+      font-size: 12px;
+      color: var(--text);
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.15s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .mode-tab:hover { background: var(--bg-soft); }
+    .mode-tab.active {
+      background: var(--text);
+      color: #fff;
+      border-color: var(--text);
+    }
+    .mode-tab-reset {
+      margin-left: auto;
+      background: transparent;
+      border: 1px solid var(--line);
+      color: var(--text-dim);
+      font-size: 11px;
+      padding: 4px 10px;
+    }
+    .mode-tab-reset:hover {
+      background: var(--bg-soft);
+      color: var(--text);
+    }
+    .field.is-locked input[type="range"] { display: none; }
+    .field.is-locked .field-value { color: var(--text-dim); }
+    .field-sub {
+      font-size: 11px;
+      color: var(--text-faint);
+      margin-top: 2px;
+    }
+
+    /* Stepper toolbar for editing per-day ride counts */
+    .stepper-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--bg-soft);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+      padding: 10px 14px;
+      margin-top: 12px;
+      flex-wrap: wrap;
+    }
+    .stepper-bar[hidden] { display: none; }
+    .stepper-day-label {
+      font-size: 13px;
+      color: var(--text);
+      font-weight: 500;
+      flex: 1 1 auto;
+    }
+    .stepper-day-label .stepper-dow {
+      color: var(--text-faint);
+      font-weight: 400;
+      margin-left: 4px;
+    }
+    .stepper-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .stepper-btn {
+      width: 36px; height: 36px;
+      border-radius: 50%;
+      border: 1px solid var(--line);
+      background: var(--bg-card);
+      color: var(--text);
+      font-size: 18px;
+      font-weight: 500;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      -webkit-tap-highlight-color: transparent;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .stepper-btn:hover { background: var(--bg-soft); border-color: var(--text-faint); }
+    .stepper-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+    .stepper-count {
+      min-width: 28px;
+      text-align: center;
+      font-variant-numeric: tabular-nums;
+      font-weight: 600;
+      font-size: 16px;
+    }
+    .stepper-link {
+      background: transparent;
+      border: none;
+      color: var(--text-dim);
+      font-size: 12px;
+      cursor: pointer;
+      padding: 6px 8px;
+      border-radius: 6px;
+      font-family: inherit;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .stepper-link:hover { color: var(--text); background: var(--bg-card); }
+    .stepper-link:disabled { opacity: 0.35; cursor: not-allowed; }
+    .stepper-close {
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--text-dim);
+      font-size: 16px;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .stepper-close:hover { background: var(--bg-card); border-color: var(--line); color: var(--text); }
+
+    .custom-hint {
+      margin-top: 8px;
+      font-size: 12px;
+      color: var(--text-faint);
+      text-align: center;
+      font-style: italic;
+    }
+    .custom-hint[hidden] { display: none; }
+
+    /* Selected-day column highlight + overflow badge inside the dist chart */
+    .dist-col-select {
+      fill: rgba(130, 168, 56, 0.10);
+      stroke: var(--lime);
+      stroke-width: 1;
+      stroke-dasharray: 3 2;
+      pointer-events: none;
+    }
+    .dist-col-hit {
+      fill: transparent;
+      cursor: pointer;
+    }
+    .dist-overflow-badge {
+      font-size: 9px;
+      font-weight: 600;
+      fill: var(--text-dim);
+      font-family: ui-monospace, "SF Mono", Menlo, monospace;
+      pointer-events: none;
+    }
+    @media (max-width: 560px) {
+      .stepper-bar { padding: 10px; gap: 6px; }
+      .stepper-day-label { font-size: 12px; }
+    }
+
     footer {
       margin-top: 40px;
       color: var(--text-faint);
@@ -623,11 +787,19 @@
         <button type="button" class="bundle-action primary" id="passes-optimal">Find optimal combo</button>
       </div>
 
+      <div class="mode-tabs" role="tablist" aria-label="Ride pattern source">
+        <span class="mode-label">Pattern</span>
+        <button type="button" class="mode-tab active" role="tab" data-mode="preset" aria-selected="true">Preset</button>
+        <button type="button" class="mode-tab" role="tab" data-mode="custom" aria-selected="false">Custom days</button>
+        <button type="button" class="mode-tab mode-tab-reset" id="custom-reset" hidden>↺ Reset to <span id="custom-reset-label">Uniform</span></button>
+      </div>
+
       <div class="calc-grid">
-        <div class="field">
+        <div class="field" id="field-rpm">
           <div class="field-label">Rides per month</div>
           <div class="field-value"><span id="rpm-val">22</span><span class="unit">/month</span></div>
           <input id="rpm" type="range" min="0" max="200" value="22" step="1" />
+          <div class="field-sub" id="rpm-sub" hidden>from your selections</div>
         </div>
         <div class="field">
           <div class="field-label">Average ride length</div>
@@ -668,6 +840,19 @@
 
       <div class="chart-wrap dist-wrap">
         <svg class="chart" id="chart-dist" viewBox="0 0 720 320" preserveAspectRatio="xMidYMid meet" aria-label="Ride distribution across days of the month"></svg>
+      </div>
+
+      <div class="custom-hint" id="custom-hint" hidden>Tap a day to edit · changes are saved on this device</div>
+
+      <div class="stepper-bar" id="stepper-bar" hidden role="group" aria-label="Edit selected day">
+        <div class="stepper-day-label" id="stepper-day-label">Day —<span class="stepper-dow"></span></div>
+        <div class="stepper-controls">
+          <button type="button" class="stepper-btn" id="stepper-minus" aria-label="Remove one ride">−</button>
+          <span class="stepper-count" id="stepper-count">0</span>
+          <button type="button" class="stepper-btn" id="stepper-plus" aria-label="Add one ride">+</button>
+        </div>
+        <button type="button" class="stepper-link" id="stepper-undo" disabled>↶ Undo</button>
+        <button type="button" class="stepper-close" id="stepper-close" aria-label="Close editor">✕</button>
       </div>
 
       <div class="dist-stats" id="dist-stats"></div>
@@ -732,6 +917,11 @@
       { id: 'weekends', label: 'Weekends', active: isWeekend },
     ];
     let currentDist = 'uniform';
+    // 'custom' mode: integer ride counts the user has painted day-by-day.
+    // When currentDist === 'custom', dayMinsForDist / rideCountsPerDay
+    // ignore the `rides` argument and read this array instead — the rides
+    // slider becomes a derived sum.
+    let customCounts = new Array(MONTH_DAYS).fill(0);
 
     function getDist(id) { return DISTRIBUTIONS.find(d => d.id === id) || DISTRIBUTIONS[0]; }
     function distActiveDays(distId) {
@@ -740,8 +930,15 @@
       for (let d = 1; d <= MONTH_DAYS; d++) if (def.active(d)) out.push(d);
       return out;
     }
+    function sumCustom() {
+      return customCounts.reduce((s, c) => s + c, 0);
+    }
     // Continuous mins-per-day for cost calc (linear in rides).
     function dayMinsForDist(rides, avg, distId) {
+      if (distId === 'custom') {
+        if (avg <= 0) return new Array(MONTH_DAYS).fill(0);
+        return customCounts.map(c => c * avg);
+      }
       const arr = new Array(MONTH_DAYS).fill(0);
       const active = distActiveDays(distId);
       if (active.length === 0 || rides <= 0 || avg <= 0) return arr;
@@ -753,6 +950,7 @@
     // Bresenham-like spread so e.g. 11 rides over 22 weekdays land on
     // every other weekday rather than only the first 11.
     function rideCountsPerDay(rides, distId) {
+      if (distId === 'custom') return customCounts.slice();
       const arr = new Array(MONTH_DAYS).fill(0);
       const active = distActiveDays(distId);
       if (active.length === 0 || rides <= 0) return arr;
@@ -761,6 +959,12 @@
         arr[active[idx] - 1]++;
       }
       return arr;
+    }
+    // Derive the count vector a preset would produce at a given volume,
+    // so switching Preset → Custom can seed customCounts from what the
+    // user currently sees.
+    function presetCountsFor(presetId, rides) {
+      return rideCountsPerDay(rides, presetId);
     }
 
     // Time-based "non-overlapping windows in a month" cap. Used as a
@@ -1425,11 +1629,34 @@
         .attr('x1', 0).attr('x2', iw)
         .attr('y1', dotsAreaH).attr('y2', dotsAreaH);
 
-      // Render groups (z-order)
+      // Render groups (z-order). Hit-rects go BELOW everything so the
+      // dots/bars render on top, but they catch clicks per day column
+      // when Custom mode is active.
+      const hitsG = g.append('g').attr('class', 'dist-hits');
+      const selectG = g.append('g').attr('class', 'dist-select');
       const ridesG = g.append('g').attr('class', 'dist-rides');
+      const overflowG = g.append('g').attr('class', 'dist-overflow');
       const barsG  = g.append('g').attr('class', 'dist-bars');
       const labelsG = g.append('g').attr('class', 'dist-labels')
         .attr('transform', `translate(0,${ih + 8})`);
+
+      // One invisible hit rect spanning the whole chart area. We snap
+      // the click's x-coordinate to the nearest day column rather than
+      // building 30 narrow hit-rects — on mobile each column is only
+      // ~12px wide, so snap-to-nearest is more forgiving.
+      hitsG.attr('pointer-events', 'none');
+      hitsG.append('rect')
+        .attr('class', 'dist-col-hit')
+        .attr('x', 0).attr('y', -4)
+        .attr('width', iw).attr('height', ih + 8)
+        .on('click', function(event) {
+          // Map x to day in the local g coordinate space.
+          const pt = d3.pointer(event, g.node());
+          const localX = pt[0];
+          if (localX < 0 || localX > iw) return;
+          const d = Math.max(1, Math.min(MONTH_DAYS, Math.floor(localX / colWidth) + 1));
+          onDayClick(d);
+        });
 
       const daysList = Array.from({ length: MONTH_DAYS }, (_, i) => i + 1);
       labelsG.selectAll('text.dist-day-dow').data(daysList).enter().append('text')
@@ -1452,16 +1679,25 @@
         const placements = placementsFor(counts, rides, avg, distId);
         const assignments = assignRides(rides, avg, counts, distId);
 
-        // Slot indices for stacking dots within each day column.
+        // Slot indices for stacking dots within each day column. Cap
+        // the visible stack so dots stay tappable on mobile; days with
+        // more rides get a "+N" badge above the column instead.
+        const VISIBLE_CAP = 12;
         const slotByDay = new Array(MONTH_DAYS + 2).fill(0);
-        const dotData = assignments.map((a, i) => {
-          const slot = slotByDay[a.day]++;
-          return { rideIdx: i, day: a.day, slot, color: a.color };
+        const dotData = [];
+        const overflowByDay = {};
+        assignments.forEach((a, i) => {
+          if (slotByDay[a.day] < VISIBLE_CAP) {
+            dotData.push({ rideIdx: i, day: a.day, slot: slotByDay[a.day], color: a.color });
+            slotByDay[a.day]++;
+          } else {
+            overflowByDay[a.day] = (overflowByDay[a.day] || 0) + 1;
+          }
         });
 
-        // Dynamic dot sizing — fit the tallest stack with breathing room.
-        const maxStack = Math.max(1, ...dayCounts);
-        const dotSpacing = Math.min(14, dotsAreaH / (maxStack + 0.8));
+        // Dynamic dot sizing — fit the tallest VISIBLE stack with breathing room.
+        const visibleMax = Math.max(1, ...Object.values(slotByDay), ...dayCounts.map(c => Math.min(c, VISIBLE_CAP)));
+        const dotSpacing = Math.min(14, dotsAreaH / (visibleMax + 0.8));
         const dotR = Math.max(2, Math.min(5.5, dotSpacing * 0.42));
 
         // Ride dots
@@ -1485,6 +1721,18 @@
           .attr('cy', d => dotsAreaH - (d.slot + 0.5) * dotSpacing)
           .attr('r', dotR)
           .attr('opacity', 0.95);
+
+        // +N overflow badges for days whose stacks exceed VISIBLE_CAP.
+        const overflowData = Object.entries(overflowByDay).map(([day, n]) => ({ day: +day, n }));
+        const badges = overflowG.selectAll('text.dist-overflow-badge').data(overflowData, d => d.day);
+        badges.exit().remove();
+        badges.enter().append('text')
+          .attr('class', 'dist-overflow-badge')
+          .attr('text-anchor', 'middle')
+          .merge(badges)
+          .attr('x', d => x(d.day))
+          .attr('y', d => Math.max(8, dotsAreaH - VISIBLE_CAP * dotSpacing - 4))
+          .text(d => `+${d.n}`);
 
         // Bundle bars — one row per placement, in greedy order. Each
         // placement is split into an "active" portion (solid colour, the
@@ -1599,14 +1847,35 @@
         `;
       }
 
-      return { render };
+      function setSelected(day) {
+        const sel = selectG.selectAll('rect.dist-col-select').data(day ? [day] : []);
+        sel.exit().remove();
+        sel.enter().append('rect')
+          .attr('class', 'dist-col-select')
+          .attr('rx', 3).attr('ry', 3)
+          .merge(sel)
+          .attr('x', d => colLeft(d) + 1)
+          .attr('y', -4)
+          .attr('width', colWidth - 2)
+          .attr('height', ih + 8);
+      }
+      function setEditable(on) {
+        hitsG.attr('pointer-events', on ? 'auto' : 'none');
+      }
+
+      return { render, setSelected, setEditable };
     })();
 
     let currentAvg = null;
     let currentViewMax = null;
+    function effectiveRpm() {
+      return currentDist === 'custom'
+        ? sumCustom()
+        : (+document.getElementById('rpm').value);
+    }
     function readInputs() {
-      const rpm = +document.getElementById('rpm').value;
       const avg = +document.getElementById('avg').value;
+      const rpm = effectiveRpm();
       const viewMax = chartMaxFor(rpm);
       document.getElementById('rpm-val').textContent = rpm;
       document.getElementById('avg-val').textContent = avg;
@@ -1621,9 +1890,12 @@
     document.getElementById('rpm').addEventListener('input', readInputs);
     document.getElementById('avg').addEventListener('input', readInputs);
 
-    // Distribution pills
+    // Distribution pills (Uniform / Weekdays / Weekends). Clicking one
+    // implicitly switches back to Preset mode if we were in Custom.
+    let lastPresetId = 'uniform';
     function setCurrentDist(distId) {
       currentDist = distId;
+      if (distId !== 'custom') lastPresetId = distId;
       document.querySelectorAll('.dist-tab').forEach(el => {
         el.classList.toggle('active', el.dataset.id === distId);
         el.setAttribute('aria-selected', el.dataset.id === distId ? 'true' : 'false');
@@ -1641,10 +1913,168 @@
         btn.className = 'dist-tab' + (d.id === currentDist ? ' active' : '');
         btn.setAttribute('aria-selected', d.id === currentDist ? 'true' : 'false');
         btn.textContent = d.label;
-        btn.addEventListener('click', () => setCurrentDist(d.id));
+        btn.addEventListener('click', () => {
+          if (currentDist === 'custom') setMode('preset', { restorePreset: d.id });
+          else setCurrentDist(d.id);
+        });
         container.appendChild(btn);
       });
     })();
+
+    // === Custom-mode state, persistence, and UI =====================
+    // Source of truth: customCounts[]. Slider becomes derived sum.
+    const LS_KEY = 'lime-custom-counts-v1';
+    let selectedDay = null;
+    const undoStack = []; // snapshots of customCounts, capped
+    const UNDO_CAP = 20;
+    let saveTimer = null;
+    function saveCustomDebounced() {
+      if (saveTimer) clearTimeout(saveTimer);
+      saveTimer = setTimeout(() => {
+        try { localStorage.setItem(LS_KEY, JSON.stringify(customCounts)); }
+        catch (e) { /* private mode, quota, etc. — silently skip */ }
+      }, 500);
+    }
+    function loadCustomFromStorage() {
+      try {
+        const raw = localStorage.getItem(LS_KEY);
+        if (!raw) return false;
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed) || parsed.length !== MONTH_DAYS) return false;
+        for (let i = 0; i < MONTH_DAYS; i++) {
+          const v = Math.max(0, Math.floor(+parsed[i] || 0));
+          customCounts[i] = v;
+        }
+        return customCounts.some(c => c > 0);
+      } catch (e) { return false; }
+    }
+    function snapshotForUndo() {
+      undoStack.push(customCounts.slice());
+      if (undoStack.length > UNDO_CAP) undoStack.shift();
+      refreshStepperUi();
+    }
+    function setMode(mode, opts = {}) {
+      const goingCustom = mode === 'custom';
+      if (goingCustom && currentDist !== 'custom') {
+        // First-time entry: seed customCounts from whatever's currently
+        // on screen. If customCounts already has data (loaded from
+        // localStorage, or stashed from an earlier custom session in
+        // this tab), preserve it.
+        if (sumCustom() === 0) {
+          const seedRides = +document.getElementById('rpm').value;
+          const seed = presetCountsFor(currentDist, seedRides);
+          for (let i = 0; i < MONTH_DAYS; i++) customCounts[i] = seed[i];
+          saveCustomDebounced();
+        }
+        undoStack.length = 0;
+      }
+      // Toggle mode-tab UI
+      document.querySelectorAll('.mode-tab[data-mode]').forEach(el => {
+        const active = el.dataset.mode === mode;
+        el.classList.toggle('active', active);
+        el.setAttribute('aria-selected', active ? 'true' : 'false');
+      });
+      const field = document.getElementById('field-rpm');
+      const sub   = document.getElementById('rpm-sub');
+      const hint  = document.getElementById('custom-hint');
+      const resetBtn  = document.getElementById('custom-reset');
+      const resetLbl  = document.getElementById('custom-reset-label');
+      const distTabs = document.querySelector('.dist-tabs');
+      field.classList.toggle('is-locked', goingCustom);
+      sub.hidden = !goingCustom;
+      hint.hidden = !goingCustom;
+      resetBtn.hidden = !goingCustom;
+      distTabs.style.display = goingCustom ? 'none' : '';
+      // Reset button labels — capitalise lastPresetId nicely
+      const presetLabel = (DISTRIBUTIONS.find(d => d.id === lastPresetId) || DISTRIBUTIONS[0]).label;
+      resetLbl.textContent = presetLabel;
+      dist.setEditable(goingCustom);
+      if (!goingCustom) {
+        closeStepper();
+        setCurrentDist(opts.restorePreset || lastPresetId);
+      } else {
+        currentDist = 'custom';
+        readInputs();
+      }
+    }
+    function refreshStepperUi() {
+      document.getElementById('stepper-undo').disabled = undoStack.length === 0;
+      if (selectedDay == null) return;
+      const c = customCounts[selectedDay - 1] || 0;
+      document.getElementById('stepper-count').textContent = c;
+      document.getElementById('stepper-minus').disabled = c <= 0;
+    }
+    function openStepper(day) {
+      selectedDay = day;
+      const labelEl = document.getElementById('stepper-day-label');
+      const dow = 'MTWTFSS'[dayOfWeek(day)];
+      const dowLong = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][dayOfWeek(day)];
+      labelEl.innerHTML = `Day ${day}<span class="stepper-dow"> · ${dowLong}</span>`;
+      document.getElementById('stepper-bar').hidden = false;
+      document.getElementById('custom-hint').hidden = true;
+      refreshStepperUi();
+      dist.setSelected(day);
+    }
+    function closeStepper() {
+      selectedDay = null;
+      document.getElementById('stepper-bar').hidden = true;
+      if (currentDist === 'custom') document.getElementById('custom-hint').hidden = false;
+      dist.setSelected(null);
+    }
+    function onDayClick(day) {
+      if (currentDist !== 'custom') return;
+      if (selectedDay === day) {
+        closeStepper();
+        return;
+      }
+      openStepper(day);
+    }
+    function bumpDay(delta) {
+      if (selectedDay == null) return;
+      const i = selectedDay - 1;
+      const next = Math.max(0, customCounts[i] + delta);
+      if (next === customCounts[i]) return;
+      snapshotForUndo();
+      customCounts[i] = next;
+      saveCustomDebounced();
+      readInputs();
+      refreshStepperUi();
+    }
+    function undoLast() {
+      if (undoStack.length === 0) return;
+      const prev = undoStack.pop();
+      for (let i = 0; i < MONTH_DAYS; i++) customCounts[i] = prev[i];
+      saveCustomDebounced();
+      readInputs();
+      refreshStepperUi();
+    }
+    function resetToPreset() {
+      if (currentDist !== 'custom') return;
+      // Preserve total rides — redistribute them into the preset's shape.
+      const seedRides = sumCustom();
+      const seed = presetCountsFor(lastPresetId, seedRides);
+      snapshotForUndo();
+      for (let i = 0; i < MONTH_DAYS; i++) customCounts[i] = seed[i];
+      saveCustomDebounced();
+      readInputs();
+      refreshStepperUi();
+    }
+    // Wire up controls
+    document.querySelectorAll('.mode-tab[data-mode]').forEach(el => {
+      el.addEventListener('click', () => setMode(el.dataset.mode));
+    });
+    document.getElementById('stepper-plus').addEventListener('click', () => bumpDay(+1));
+    document.getElementById('stepper-minus').addEventListener('click', () => bumpDay(-1));
+    document.getElementById('stepper-undo').addEventListener('click', undoLast);
+    document.getElementById('stepper-close').addEventListener('click', closeStepper);
+    document.getElementById('custom-reset').addEventListener('click', resetToPreset);
+    // Restore from localStorage on load. If the user had a saved custom
+    // pattern, default into Custom mode so their work is visible right
+    // away. Otherwise stay on the Preset default.
+    if (loadCustomFromStorage()) {
+      // Defer to next tick so the dist module is fully wired first.
+      setTimeout(() => setMode('custom'), 0);
+    }
 
     // Bundle counter cards + actions
     function setPassCounts(newCounts) {
@@ -1696,7 +2126,7 @@
       setPassCounts([0, 0, 0, 0]);
     });
     document.getElementById('passes-optimal').addEventListener('click', () => {
-      const rpm = +document.getElementById('rpm').value;
+      const rpm = effectiveRpm();
       const avg = +document.getElementById('avg').value;
       setPassCounts(findOptimalCounts(rpm, avg, currentDist));
     });
