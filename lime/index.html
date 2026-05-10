@@ -44,6 +44,10 @@
       -webkit-font-smoothing: antialiased;
       text-rendering: optimizeLegibility;
       line-height: 1.5;
+      /* Kills the double-tap-to-zoom gesture on mobile (which would
+         otherwise fire when rapidly tapping a day on the calendar or
+         pressing the stepper ± buttons). Pinch-zoom + pan still work. */
+      touch-action: manipulation;
     }
     body {
       background:
