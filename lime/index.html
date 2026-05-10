@@ -778,7 +778,7 @@
 
     <!-- Monthly cost vs usage -->
     <section class="card">
-      <h2>Your monthly cost · vs how much you ride</h2>
+      <h2>Your monthly cost</h2>
       <h3>Stack any combination of LimePass bundles, see when it beats PAYG and LimePrime.</h3>
 
       <div class="bundle-tabs" aria-label="LimePass bundles"></div>
@@ -808,11 +808,15 @@
         </div>
       </div>
 
-      <div class="chart-wrap">
+      <!-- Cost-vs-rides line chart sunset 2026-05; kept in DOM but
+           hidden so the JS still computes and the visual focus is the
+           plan-results table + winner banner below + dot chart in the
+           next card. Re-enable by removing the `hidden` attributes. -->
+      <div class="chart-wrap" hidden>
         <svg class="chart" id="chart-monthly" viewBox="0 0 720 420" preserveAspectRatio="xMidYMid meet" aria-label="Monthly cost vs rides per month"></svg>
       </div>
 
-      <div class="legend" id="legend-monthly"></div>
+      <div class="legend" id="legend-monthly" hidden></div>
 
       <table class="results" id="results-monthly">
         <thead>
@@ -827,7 +831,7 @@
       </div>
 
       <p class="notes">
-        Use <b>+</b> / <b>−</b> to stack any combination of LimePass bundles. Each bundle only covers usage inside its validity window (1 / 3 / 7 / 30 days), so a 7-day pass can cover at most one week's rides — the line is colour-coded by which pass is being consumed at each point, with a dot at every transition. Buying more bundles than fit in a month (e.g. 2× 30D) wastes the extras. <b>Find optimal combo</b> brute-forces the cheapest realistic stack for your rides/avg. Unused minutes are valued at the combo's blended per-minute rate. London PAYG rates as of the November 2025 hike (£1 unlock + 31p/min, £1 flat under 5 min).
+        Use <b>+</b> / <b>−</b> to stack any combination of LimePass bundles. Each bundle only covers usage inside its validity window (1 / 3 / 7 / 30 days), so a 7-day pass can cover at most one week's rides. Buying more bundles than fit in a month (e.g. 2× 30D) wastes the extras. <b>Find optimal combo</b> brute-forces the cheapest realistic stack for your rides/avg. Unused minutes are valued at the combo's blended per-minute rate. London PAYG rates as of the November 2025 hike (£1 unlock + 31p/min, £1 flat under 5 min).
       </p>
     </section>
 
