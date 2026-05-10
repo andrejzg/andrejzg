@@ -447,50 +447,6 @@
     }
 
     /* Pattern source: Preset vs Custom mode */
-    .mode-tabs {
-      display: flex;
-      gap: 6px;
-      align-items: center;
-      margin: 0 0 10px;
-      flex-wrap: wrap;
-    }
-    .mode-tabs .mode-label {
-      font-size: 11px;
-      color: var(--text-faint);
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      margin-right: 4px;
-    }
-    .mode-tab {
-      background: var(--bg-card);
-      border: 1px solid var(--line);
-      border-radius: 999px;
-      padding: 5px 12px;
-      font-family: inherit;
-      font-size: 12px;
-      color: var(--text);
-      cursor: pointer;
-      transition: background 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.15s;
-      -webkit-tap-highlight-color: transparent;
-    }
-    .mode-tab:hover { background: var(--bg-soft); }
-    .mode-tab.active {
-      background: var(--text);
-      color: #fff;
-      border-color: var(--text);
-    }
-    .mode-tab-reset {
-      margin-left: auto;
-      background: transparent;
-      border: 1px solid var(--line);
-      color: var(--text-dim);
-      font-size: 11px;
-      padding: 4px 10px;
-    }
-    .mode-tab-reset:hover {
-      background: var(--bg-soft);
-      color: var(--text);
-    }
     .field.is-locked input[type="range"] { display: none; }
     .field.is-locked .field-value { color: var(--text-dim); }
     .field-sub {
@@ -793,13 +749,6 @@
     <section class="card">
       <h2>Your monthly cost</h2>
 
-      <div class="mode-tabs" role="tablist" aria-label="Ride pattern source">
-        <span class="mode-label">Pattern</span>
-        <button type="button" class="mode-tab active" role="tab" data-mode="preset" aria-selected="true">Preset</button>
-        <button type="button" class="mode-tab" role="tab" data-mode="custom" aria-selected="false">Custom days</button>
-        <button type="button" class="mode-tab mode-tab-reset" id="custom-reset" hidden>↺ Reset to <span id="custom-reset-label">Uniform</span></button>
-      </div>
-
       <div class="calc-grid">
         <div class="field" id="field-rpm">
           <div class="field-row">
@@ -857,7 +806,7 @@
         <svg class="chart" id="chart-dist" viewBox="0 0 720 320" preserveAspectRatio="xMidYMid meet" aria-label="Ride distribution across days of the month"></svg>
       </div>
 
-      <div class="custom-hint" id="custom-hint" hidden>Tap a day to edit · changes are saved on this device</div>
+      <div class="custom-hint" id="custom-hint" hidden>Click on chart to add rides to that day · changes are saved on this device</div>
 
       <div class="stepper-bar" id="stepper-bar" hidden role="group" aria-label="Edit selected day">
         <div class="stepper-day-label" id="stepper-day-label">Day —<span class="stepper-dow"></span></div>
@@ -957,6 +906,9 @@
       { id: 'uniform',  label: 'Uniform',  active: () => true },
       { id: 'weekdays', label: 'Weekdays', active: isWeekday },
       { id: 'weekends', label: 'Weekends', active: isWeekend },
+      // 'custom' lives in the same row but bypasses the active fn —
+      // dayMinsForDist/rideCountsPerDay read customCounts directly.
+      { id: 'custom',   label: 'Custom',   active: () => true },
     ];
     let currentDist = 'uniform';
     // 'custom' mode: integer ride counts the user has painted day-by-day.
@@ -1973,17 +1925,36 @@
     document.getElementById('rpm').addEventListener('input', readInputs);
     document.getElementById('avg').addEventListener('input', readInputs);
 
-    // Distribution pills (Uniform / Weekdays / Weekends). Clicking one
-    // implicitly switches back to Preset mode if we were in Custom.
-    let lastPresetId = 'uniform';
+    // Distribution pills (Uniform / Weekdays / Weekends / Custom).
+    // Custom is the same kind of pill — clicking it locks the rides
+    // slider (volume becomes the sum of painted dots), shows the hint
+    // text, and makes the chart's hit area editable. On first entry
+    // customCounts is seeded from whatever preset was active, so the
+    // chart isn't suddenly empty.
     function setCurrentDist(distId) {
+      const isCustom = distId === 'custom';
+      const wasCustom = currentDist === 'custom';
+      if (isCustom && !wasCustom && sumCustom() === 0) {
+        const seedRides = +document.getElementById('rpm').value;
+        const seed = presetCountsFor(currentDist, seedRides);
+        for (let i = 0; i < MONTH_DAYS; i++) customCounts[i] = seed[i];
+        saveCustomDebounced();
+      }
       currentDist = distId;
-      if (distId !== 'custom') lastPresetId = distId;
       document.querySelectorAll('.dist-tab').forEach(el => {
-        el.classList.toggle('active', el.dataset.id === distId);
-        el.setAttribute('aria-selected', el.dataset.id === distId ? 'true' : 'false');
+        const active = el.dataset.id === distId;
+        el.classList.toggle('active', active);
+        el.setAttribute('aria-selected', active ? 'true' : 'false');
       });
-      currentAvg = null; // force line recompute on next readInputs
+      document.getElementById('field-rpm').classList.toggle('is-locked', isCustom);
+      document.getElementById('rpm-sub').hidden = !isCustom;
+      document.getElementById('custom-hint').hidden = !isCustom;
+      dist.setEditable(isCustom);
+      if (!isCustom) {
+        closeStepper();
+        undoStack.length = 0;
+      }
+      currentAvg = null;
       readInputs();
     }
     (function renderDistTabs() {
@@ -1996,10 +1967,7 @@
         btn.className = 'dist-tab' + (d.id === currentDist ? ' active' : '');
         btn.setAttribute('aria-selected', d.id === currentDist ? 'true' : 'false');
         btn.textContent = d.label;
-        btn.addEventListener('click', () => {
-          if (currentDist === 'custom') setMode('preset', { restorePreset: d.id });
-          else setCurrentDist(d.id);
-        });
+        btn.addEventListener('click', () => setCurrentDist(d.id));
         container.appendChild(btn);
       });
     })();
@@ -2080,50 +2048,6 @@
       if (undoStack.length > UNDO_CAP) undoStack.shift();
       refreshStepperUi();
     }
-    function setMode(mode, opts = {}) {
-      const goingCustom = mode === 'custom';
-      if (goingCustom && currentDist !== 'custom') {
-        // First-time entry: seed customCounts from whatever's currently
-        // on screen. If customCounts already has data (loaded from
-        // localStorage, or stashed from an earlier custom session in
-        // this tab), preserve it.
-        if (sumCustom() === 0) {
-          const seedRides = +document.getElementById('rpm').value;
-          const seed = presetCountsFor(currentDist, seedRides);
-          for (let i = 0; i < MONTH_DAYS; i++) customCounts[i] = seed[i];
-          saveCustomDebounced();
-        }
-        undoStack.length = 0;
-      }
-      // Toggle mode-tab UI
-      document.querySelectorAll('.mode-tab[data-mode]').forEach(el => {
-        const active = el.dataset.mode === mode;
-        el.classList.toggle('active', active);
-        el.setAttribute('aria-selected', active ? 'true' : 'false');
-      });
-      const field = document.getElementById('field-rpm');
-      const sub   = document.getElementById('rpm-sub');
-      const hint  = document.getElementById('custom-hint');
-      const resetBtn  = document.getElementById('custom-reset');
-      const resetLbl  = document.getElementById('custom-reset-label');
-      const distTabs = document.querySelector('.dist-tabs');
-      field.classList.toggle('is-locked', goingCustom);
-      sub.hidden = !goingCustom;
-      hint.hidden = !goingCustom;
-      resetBtn.hidden = !goingCustom;
-      distTabs.style.display = goingCustom ? 'none' : '';
-      // Reset button labels — capitalise lastPresetId nicely
-      const presetLabel = (DISTRIBUTIONS.find(d => d.id === lastPresetId) || DISTRIBUTIONS[0]).label;
-      resetLbl.textContent = presetLabel;
-      dist.setEditable(goingCustom);
-      if (!goingCustom) {
-        closeStepper();
-        setCurrentDist(opts.restorePreset || lastPresetId);
-      } else {
-        currentDist = 'custom';
-        readInputs();
-      }
-    }
     function refreshStepperUi() {
       document.getElementById('stepper-undo').disabled = undoStack.length === 0;
       if (selectedDay == null) return;
@@ -2175,26 +2099,11 @@
       readInputs();
       refreshStepperUi();
     }
-    function resetToPreset() {
-      if (currentDist !== 'custom') return;
-      // Preserve total rides — redistribute them into the preset's shape.
-      const seedRides = sumCustom();
-      const seed = presetCountsFor(lastPresetId, seedRides);
-      snapshotForUndo();
-      for (let i = 0; i < MONTH_DAYS; i++) customCounts[i] = seed[i];
-      saveCustomDebounced();
-      readInputs();
-      refreshStepperUi();
-    }
     // Wire up controls
-    document.querySelectorAll('.mode-tab[data-mode]').forEach(el => {
-      el.addEventListener('click', () => setMode(el.dataset.mode));
-    });
     document.getElementById('stepper-plus').addEventListener('click', () => bumpDay(+1));
     document.getElementById('stepper-minus').addEventListener('click', () => bumpDay(-1));
     document.getElementById('stepper-undo').addEventListener('click', undoLast);
     document.getElementById('stepper-close').addEventListener('click', closeStepper);
-    document.getElementById('custom-reset').addEventListener('click', resetToPreset);
 
     // === Month picker ==============================================
     const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -2341,7 +2250,7 @@
     updateMonthButton();
     dist.layoutCalendar();
     if (hasCustomData) {
-      setTimeout(() => setMode('custom'), 0);
+      setTimeout(() => setCurrentDist('custom'), 0);
     }
 
     readInputs();
