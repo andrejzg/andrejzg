@@ -234,7 +234,9 @@
       width: 100%;
       height: auto;
       overflow: visible;
-      touch-action: pan-y;
+      /* manipulation = pan + pinch-zoom allowed, double-tap zoom off.
+         Was `pan-y`, which silently blocked pinch-zoom on the chart. */
+      touch-action: manipulation;
     }
     .axis path, .axis line {
       stroke: var(--line);
