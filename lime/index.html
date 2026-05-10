@@ -952,9 +952,10 @@
       }
       return { idx: -1, copy: 0, color: COLORS.payg, key: 'payg' };
     }
-    // Per-type hard caps for the brute-force search. Enough to find any
-    // realistic optimum without exploring obviously-wasteful stacks.
-    const OPTIMAL_HARD_CAPS = [12, 8, 6, 4]; // 1D, 3D, 7D, 30D
+    // Per-type hard caps for the brute-force search. Beyond these counts
+    // a strictly cheaper substitution exists (4×1D > 2×3D in £/min, etc.),
+    // so capping is sound for realistic inputs and bounds search cost.
+    const OPTIMAL_HARD_CAPS = [4, 6, 10, 12]; // 1D, 3D, 7D, 30D
     function findOptimalCounts(rides, avg, distId) {
       if (rides <= 0 || avg <= 0) return [0, 0, 0, 0];
       const totalMins = rides * avg;
@@ -963,40 +964,56 @@
         const usage = Math.ceil(totalMins / b.mins) + 1;
         return Math.min(OPTIMAL_HARD_CAPS[i], Math.max(time, usage));
       });
-      let best = { counts: [0, 0, 0, 0], cost: rides * paygCost(avg) };
       const dayMins = dayMinsForDist(rides, avg, distId);
       const dayCounts = rideCountsPerDay(rides, distId);
+      const pCost = paygCost(avg);
+      const p0 = BUNDLES[0].price, p1 = BUNDLES[1].price,
+            p2 = BUNDLES[2].price, p3 = BUNDLES[3].price;
+      let best = { counts: [0, 0, 0, 0], cost: rides * pCost };
       // Score each combo with the same discrete ride-fit as assignRides:
       // each ride needs ≥avg minutes left in ONE bundle, so a bundle with
       // (avg-1) trailing minutes can't take another ride. Continuous
       // covered/avg misses that and overpays for finely-fitted stacks.
-      for (let n0 = 0; n0 <= caps[0]; n0++)
-      for (let n1 = 0; n1 <= caps[1]; n1++)
-      for (let n2 = 0; n2 <= caps[2]; n2++)
-      for (let n3 = 0; n3 <= caps[3]; n3++) {
-        const counts = [n0, n1, n2, n3];
-        const placements = placeBundles(counts, dayMins);
-        const remaining = placements.map(p => p.cap);
-        let ridesOver = 0;
-        for (let d = 1; d <= MONTH_DAYS; d++) {
-          const cnt = dayCounts[d - 1];
-          for (let n = 0; n < cnt; n++) {
-            let chosenIdx = -1, chosenEnd = Infinity, chosenMins = Infinity;
-            for (let pi = 0; pi < placements.length; pi++) {
-              const p = placements[pi];
-              if (p.start <= d && p.end >= d && remaining[pi] >= avg - 1e-9) {
-                const bm = BUNDLES[p.idx].mins;
-                if (p.end < chosenEnd || (p.end === chosenEnd && bm < chosenMins)) {
-                  chosenIdx = pi; chosenEnd = p.end; chosenMins = bm;
+      // Nested early-exit: bundle prices are positive, so once cumulative
+      // bundle cost ≥ best, every deeper combo is at least as expensive.
+      for (let n0 = 0; n0 <= caps[0]; n0++) {
+        const c0 = n0 * p0;
+        if (c0 >= best.cost - 0.005) break;
+        for (let n1 = 0; n1 <= caps[1]; n1++) {
+          const c01 = c0 + n1 * p1;
+          if (c01 >= best.cost - 0.005) break;
+          for (let n2 = 0; n2 <= caps[2]; n2++) {
+            const c012 = c01 + n2 * p2;
+            if (c012 >= best.cost - 0.005) break;
+            for (let n3 = 0; n3 <= caps[3]; n3++) {
+              const bundleCost = c012 + n3 * p3;
+              if (bundleCost >= best.cost - 0.005) break;
+              const counts = [n0, n1, n2, n3];
+              const placements = placeBundles(counts, dayMins);
+              const remaining = placements.map(p => p.cap);
+              let ridesOver = 0;
+              for (let d = 1; d <= MONTH_DAYS; d++) {
+                const cnt = dayCounts[d - 1];
+                for (let n = 0; n < cnt; n++) {
+                  let chosenIdx = -1, chosenEnd = Infinity, chosenMins = Infinity;
+                  for (let pi = 0; pi < placements.length; pi++) {
+                    const p = placements[pi];
+                    if (p.start <= d && p.end >= d && remaining[pi] >= avg - 1e-9) {
+                      const bm = BUNDLES[p.idx].mins;
+                      if (p.end < chosenEnd || (p.end === chosenEnd && bm < chosenMins)) {
+                        chosenIdx = pi; chosenEnd = p.end; chosenMins = bm;
+                      }
+                    }
+                  }
+                  if (chosenIdx >= 0) remaining[chosenIdx] -= avg;
+                  else ridesOver++;
                 }
               }
+              const cost = bundleCost + ridesOver * pCost;
+              if (cost < best.cost - 0.005) best = { counts, cost };
             }
-            if (chosenIdx >= 0) remaining[chosenIdx] -= avg;
-            else ridesOver++;
           }
         }
-        const cost = comboBundleCost(counts) + ridesOver * paygCost(avg);
-        if (cost < best.cost - 0.005) best = { counts, cost };
       }
       return best.counts;
     }
