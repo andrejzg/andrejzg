@@ -777,22 +777,27 @@
       color: var(--text);
       font-weight: 500;
     }
-    .month-picker-back {
-      width: 28px; height: 28px;
+    .month-picker-nav {
+      width: 32px; height: 32px;
       border-radius: 6px;
       border: 1px solid transparent;
       background: transparent;
       color: var(--text-dim);
       cursor: pointer;
-      font-size: 16px;
+      font-size: 18px;
+      line-height: 1;
       display: inline-flex;
       align-items: center;
       justify-content: center;
       -webkit-tap-highlight-color: transparent;
     }
-    .month-picker-back:hover { background: var(--bg-soft); border-color: var(--line); color: var(--text); }
-    .month-picker-back[disabled] { opacity: 0; pointer-events: none; }
-    .month-picker-title { flex: 1 1 auto; text-align: center; }
+    .month-picker-nav:hover { background: var(--bg-soft); border-color: var(--line); color: var(--text); }
+    .month-picker-nav[hidden] { visibility: hidden; display: inline-flex; }
+    .month-picker-title {
+      flex: 1 1 auto;
+      text-align: center;
+      font-variant-numeric: tabular-nums;
+    }
     .month-picker-grid {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
@@ -962,8 +967,9 @@
           </button>
           <div class="month-picker-pop" id="month-picker-pop" hidden role="dialog" aria-label="Pick month">
             <div class="month-picker-head">
-              <button type="button" class="month-picker-back" id="month-picker-back" aria-label="Back to years" disabled>‹</button>
-              <div class="month-picker-title" id="month-picker-title">Year</div>
+              <button type="button" class="month-picker-nav" id="month-picker-prev" aria-label="Previous">‹</button>
+              <div class="month-picker-title" id="month-picker-title">—</div>
+              <button type="button" class="month-picker-nav" id="month-picker-next" aria-label="Next">›</button>
             </div>
             <div class="month-picker-grid" id="month-picker-grid"></div>
           </div>
@@ -2289,8 +2295,8 @@
     // === Month picker ==============================================
     const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
     const MONTH_NAMES_LONG = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-    let pickerView = 'year';       // 'year' | 'month'
-    let pickerYearScroll = today.getFullYear(); // centers the year grid
+    let pickerView = 'year';         // 'year' | 'month'
+    let pickerYearStart = currentYear - 5; // first year shown in 12-cell grid
     let pickerSelectedYear = currentYear;
     function updateMonthButton() {
       document.getElementById('month-picker-label').textContent =
@@ -2299,22 +2305,28 @@
     function renderPickerGrid() {
       const grid = document.getElementById('month-picker-grid');
       const title = document.getElementById('month-picker-title');
-      const back = document.getElementById('month-picker-back');
+      const prevBtn = document.getElementById('month-picker-prev');
+      const nextBtn = document.getElementById('month-picker-next');
       grid.innerHTML = '';
       if (pickerView === 'year') {
-        title.textContent = 'Year';
-        back.disabled = true;
-        // 12 years, centered on pickerYearScroll
-        const start = pickerYearScroll - 5;
+        // Range as title — "Year" was redundant.
+        title.textContent = `${pickerYearStart}–${pickerYearStart + 11}`;
+        prevBtn.hidden = false;
+        nextBtn.hidden = false;
         for (let i = 0; i < 12; i++) {
-          const y = start + i;
+          const y = pickerYearStart + i;
           const cell = document.createElement('button');
           cell.type = 'button';
           cell.className = 'month-picker-cell';
           if (y === currentYear) cell.classList.add('current');
           if (y === pickerSelectedYear) cell.classList.add('selected');
           cell.textContent = y;
-          cell.addEventListener('click', () => {
+          // stopPropagation: without it, the bubbling click reaches the
+          // document outside-click handler AFTER renderPickerGrid() has
+          // wiped this cell from the DOM, .contains(detached-target)
+          // returns false, and the picker closes instead of drilling in.
+          cell.addEventListener('click', (e) => {
+            e.stopPropagation();
             pickerSelectedYear = y;
             pickerView = 'month';
             renderPickerGrid();
@@ -2323,14 +2335,16 @@
         }
       } else {
         title.textContent = String(pickerSelectedYear);
-        back.disabled = false;
+        prevBtn.hidden = false;     // doubles as "back to year"
+        nextBtn.hidden = true;
         for (let m = 1; m <= 12; m++) {
           const cell = document.createElement('button');
           cell.type = 'button';
           cell.className = 'month-picker-cell';
           if (pickerSelectedYear === currentYear && m === currentMonth) cell.classList.add('current');
           cell.textContent = MONTH_NAMES[m - 1];
-          cell.addEventListener('click', () => {
+          cell.addEventListener('click', (e) => {
+            e.stopPropagation();
             setMonth(pickerSelectedYear, m);
             closeMonthPicker();
           });
@@ -2340,7 +2354,7 @@
     }
     function openMonthPicker() {
       pickerSelectedYear = currentYear;
-      pickerYearScroll = currentYear;
+      pickerYearStart = currentYear - 5;
       pickerView = 'year';
       renderPickerGrid();
       document.getElementById('month-picker-pop').hidden = false;
@@ -2387,9 +2401,21 @@
       const open = document.getElementById('month-picker').dataset.open === 'true';
       if (open) closeMonthPicker(); else openMonthPicker();
     });
-    document.getElementById('month-picker-back').addEventListener('click', () => {
-      pickerView = 'year';
+    document.getElementById('month-picker-prev').addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (pickerView === 'year') {
+        pickerYearStart -= 12;
+      } else {
+        pickerView = 'year';
+      }
       renderPickerGrid();
+    });
+    document.getElementById('month-picker-next').addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (pickerView === 'year') {
+        pickerYearStart += 12;
+        renderPickerGrid();
+      }
     });
     // Outside-tap dismiss + Esc dismiss.
     document.addEventListener('click', (e) => {
