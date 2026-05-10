@@ -858,8 +858,11 @@
     <h1>How much does a <em>Lime</em> ride actually cost in London?</h1>
     <p class="lede">An interactive look at the four ways to pay — PAYG, LimePrime, and the four LimePass minute bundles — and when each one wins.</p>
 
-    <!-- Plans overview -->
-    <section class="card">
+    <!-- Plans overview · hidden — we now auto-pick the optimal stack
+         and surface the comparison in the results table below. Keep in
+         DOM so the reference card can be re-enabled by removing this
+         `hidden` attribute. -->
+    <section class="card" hidden>
       <h2>The four pricing schemes</h2>
       <div class="plans">
         <div class="plan">
@@ -897,10 +900,14 @@
     <!-- Monthly cost vs usage -->
     <section class="card">
       <h2>Your monthly cost</h2>
-      <h3>Stack any combination of LimePass bundles, see when it beats PAYG and LimePrime.</h3>
+      <h3>We auto-pick the cheapest LimePass stack for your usage, and show it next to PAYG and LimePrime.</h3>
 
-      <div class="bundle-tabs" aria-label="LimePass bundles"></div>
-      <div class="bundle-actions">
+      <!-- Manual bundle selection retired — `Find optimal combo` runs
+           automatically whenever inputs change. Markup kept hidden so
+           the optimizer's render hooks (refreshPassVisuals, updateTabUi)
+           still find their elements as no-ops. -->
+      <div class="bundle-tabs" aria-label="LimePass bundles" hidden></div>
+      <div class="bundle-actions" hidden>
         <button type="button" class="bundle-action" id="passes-clear">Clear</button>
         <button type="button" class="bundle-action primary" id="passes-optimal">Find optimal combo</button>
       </div>
@@ -949,7 +956,7 @@
       </div>
 
       <p class="notes">
-        Use <b>+</b> / <b>−</b> to stack any combination of LimePass bundles. Each bundle only covers usage inside its validity window (1 / 3 / 7 / 30 days), so a 7-day pass can cover at most one week's rides. Buying more bundles than fit in a month (e.g. 2× 30D) wastes the extras. <b>Find optimal combo</b> brute-forces the cheapest realistic stack for your rides/avg. Unused minutes are valued at the combo's blended per-minute rate. London PAYG rates as of the November 2025 hike (£1 unlock + 31p/min, £1 flat under 5 min).
+        Each LimePass bundle covers usage only inside its validity window (1 / 3 / 7 / 30 days), so a 7-day pass can cover at most one week's rides. The cheapest stack is computed by brute-forcing realistic combinations and scoring each against your rides + average length; unused minutes are valued at the combo's blended per-minute rate. London PAYG rates as of the November 2025 hike (£1 unlock + 31p/min, £1 flat under 5 min).
       </p>
     </section>
 
@@ -2052,6 +2059,23 @@
         ? sumCustom()
         : (+document.getElementById('rpm').value);
     }
+    // Pure brute-force; cheap (≤ ~70ms in the realistic input band).
+    // Skip the call when nothing relevant changed by remembering the
+    // last-optimized (rpm, avg, distId, customSig) and short-circuiting.
+    let lastOptKey = null;
+    function autoOptimize(rpm, avg) {
+      // Fingerprint includes the custom counts so painting redraws too.
+      const key = currentDist === 'custom'
+        ? `c|${avg}|${customCounts.join(',')}`
+        : `${currentDist}|${rpm}|${avg}|${currentYear}-${currentMonth}`;
+      if (key === lastOptKey) return;
+      lastOptKey = key;
+      const optimal = findOptimalCounts(rpm, avg, currentDist);
+      if (passCounts.length === optimal.length && passCounts.every((c, i) => c === optimal[i])) return;
+      passCounts = optimal.slice();
+      monthly.refreshPassVisuals();
+      updateTabUi();
+    }
     function readInputs() {
       const avg = +document.getElementById('avg').value;
       const rpm = effectiveRpm();
@@ -2063,6 +2087,7 @@
         currentAvg = avg;
         currentViewMax = viewMax;
       }
+      autoOptimize(rpm, avg);
       monthly.updateCursor(rpm, avg);
       dist.render(rpm, avg, passCounts, currentDist);
     }
@@ -2388,13 +2413,13 @@
       saveCustomDebounced();
       dist.layoutCalendar();
       updateMonthButton();
-      // Re-run optimizer for the new calendar (weekend mask shifts,
-      // month length changes, custom counts may differ). The current
-      // currentAvg cache is also stale because viewMax depends on rpm.
+      // Re-render: readInputs() auto-runs the optimizer for the new
+      // calendar (weekend mask, length, possibly custom counts).
+      // currentAvg cache invalidation forces the cost-vs-rides line
+      // recompute that's still wired up (chart itself is hidden).
       currentAvg = null;
-      const rpm = effectiveRpm();
-      const avg = +document.getElementById('avg').value;
-      setPassCounts(findOptimalCounts(rpm, avg, currentDist));
+      lastOptKey = null; // force re-optimize: month is part of fingerprint
+      readInputs();
     }
     document.getElementById('month-picker-btn').addEventListener('click', (e) => {
       e.stopPropagation();
