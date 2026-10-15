@@ -21,6 +21,14 @@
       --lime: var(--link);
       --lime-bright: var(--link);
       --lime-soft: var(--bg-alt);
+      /* chart series: PAYG in the text colour, LimePrime in the link colour,
+         the four LimePass bundles as a grey ramp (shortest pass lightest) */
+      --s-payg: var(--text);
+      --s-prime: var(--link);
+      --s-b30: #8c8c8c;
+      --s-b60: #6e6e6e;
+      --s-b200: #4f4f4f;
+      --s-b400: #303030;
       --orange: #d6864a;
       --orange-soft: #fbe2cb;
       --pink: #c9759c;
@@ -40,6 +48,10 @@
       :root {
         --text-dim: #bbb;
         --text-faint: #888;
+        --s-b30: #8c8c8c;
+        --s-b60: #a8a8a8;
+        --s-b200: #c4c4c4;
+        --s-b400: #e0e0e0;
       }
     }
     article * { box-sizing: border-box; }
@@ -131,19 +143,19 @@
       appearance: none;
       height: 24px;
       width: 24px;
-      border-radius: 50%;
+      border-radius: 0;
       background: var(--lime);
       border: 3px solid var(--bg-card);
       margin-top: -10px;
-      box-shadow: 0 0 0 1px var(--lime), 0 2px 8px rgba(130,168,56,0.30);
+      box-shadow: 0 0 0 1px var(--lime);
     }
     input[type="range"]::-moz-range-thumb {
       height: 24px;
       width: 24px;
-      border-radius: 50%;
+      border-radius: 0;
       background: var(--lime);
       border: 3px solid var(--bg-card);
-      box-shadow: 0 0 0 1px var(--lime), 0 2px 8px rgba(130,168,56,0.30);
+      box-shadow: 0 0 0 1px var(--lime);
     }
 
     /* Chart */
@@ -207,7 +219,7 @@
       display: inline-block;
       width: 10px;
       height: 10px;
-      border-radius: 3px;
+      border-radius: 0;
       margin-right: 6px;
       vertical-align: middle;
     }
@@ -235,7 +247,7 @@
     .results td.cost { font-weight: 600; text-align: right; }
     .results td.cost.win { color: var(--lime); }
     .results td.cost.bad { color: var(--text-faint); }
-    .results .swatch { width: 8px; height: 8px; border-radius: 2px; display: inline-block; margin-right: 8px; vertical-align: middle; }
+    .results .swatch { width: 8px; height: 8px; border-radius: 0; display: inline-block; margin-right: 8px; vertical-align: middle; }
     .results .name { color: var(--text); }
     .results .sub { color: var(--text-faint); font-size: 12px; margin-left: 14px; display: block; }
 
@@ -280,7 +292,7 @@
       padding: 14px;
       border-radius: var(--radius-sm);
       background: var(--lime-soft);
-      border: 1px solid rgba(130,168,56,0.25);
+      border: 1px solid var(--line);
       display: flex;
       gap: 12px;
       align-items: flex-start;
@@ -323,7 +335,7 @@
     }
     .dist-wrap { aspect-ratio: 720 / 320; max-height: 380px; }
     /* Fill transitions only — geometry is animated via d3 transitions. */
-    .dist-rides circle { transition: fill 0.2s; }
+    .dist-rides rect.ride-dot { transition: fill 0.2s; }
     .dist-bars rect { transition: fill 0.2s; }
     .dist-day-num { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 9.5px; }
     .dist-day-dow { font-size: 9px; letter-spacing: 0.04em; text-transform: uppercase; }
@@ -332,7 +344,7 @@
     .dist-bar-label {
       font-size: 10px;
       font-weight: 600;
-      fill: #fff;
+      fill: var(--bg-card);
       pointer-events: none;
     }
 
@@ -473,7 +485,8 @@
 
     /* Selected-day column highlight + overflow badge inside the dist chart */
     .dist-col-select {
-      fill: rgba(130, 168, 56, 0.10);
+      fill: var(--link);
+      fill-opacity: 0.08;
       stroke: var(--lime);
       stroke-width: 1;
       stroke-dasharray: 3 2;
@@ -754,7 +767,7 @@
       <div class="dist-stats" id="dist-stats"></div>
 
       <p class="notes">
-        Each dot is one ride placed on a real day; each rounded bar below shows when a pass is "active" — bought at its left edge, expiring at its right. Dot colour = the pass that covers that ride; orange = PAYG. Each LimePass bundle covers usage only inside its validity window (1 / 3 / 7 / 30 days); the cheapest stack is brute-forced and scored against your rides + average length, with unused minutes valued at the combo's blended per-minute rate. London PAYG rates as of the November 2025 hike (£1 unlock + 31p/min, £1 flat under 5 min).
+        Each square is one ride placed on a real day; each bar below shows when a pass is "active" — bought at its left edge, expiring at its right. A ride's shade matches the pass that covers it (shorter passes are lighter); PAYG rides use the same colour as this text. Each LimePass bundle covers usage only inside its validity window (1 / 3 / 7 / 30 days); the cheapest stack is brute-forced and scored against your rides + average length, with unused minutes valued at the combo's blended per-minute rate. London PAYG rates as of the November 2025 hike (£1 unlock + 31p/min, £1 flat under 5 min).
       </p>
     </section>
 
@@ -1142,14 +1155,15 @@ live from beautiful london, england
       return best.counts;
     }
 
-    // --- Series colours (pastel, with enough contrast on warm white) -
+    // --- Series colours: CSS variables from the stylesheet, so they
+    //     follow the site's light/dark scheme (see --s-* in :root) ------
     const COLORS = {
-      payg:    '#d6864a',
-      prime:   '#82a838',
-      b30:     '#c9759c',
-      b60:     '#9986c2',
-      b200:    '#6098bd',
-      b400:    '#6dafa1',
+      payg:    'var(--s-payg)',
+      prime:   'var(--s-prime)',
+      b30:     'var(--s-b30)',
+      b60:     'var(--s-b60)',
+      b200:    'var(--s-b200)',
+      b400:    'var(--s-b400)',
     };
     const SERIES = [
       { id: 'payg',  label: 'PAYG',           color: COLORS.payg,  fn: paygCost,                       sub: '£1 unlock + 31p/min' },
@@ -1575,7 +1589,7 @@ live from beautiful london, england
         const wkRects = weekendsG.selectAll('rect').data(weekendDays, d => d);
         wkRects.exit().remove();
         wkRects.enter().append('rect')
-          .attr('fill', 'rgba(108, 105, 87, 0.05)')
+          .attr('fill', 'var(--text)').attr('fill-opacity', 0.05)
           .merge(wkRects)
           .attr('x', d => colLeft(d))
           .attr('y', 0)
@@ -1645,25 +1659,26 @@ live from beautiful london, england
         const dotR = Math.max(2, Math.min(5.5, dotSpacing * 0.42));
 
         // Ride dots
-        const dots = ridesG.selectAll('circle.ride-dot').data(dotData, d => d.rideIdx);
+        const dots = ridesG.selectAll('rect.ride-dot').data(dotData, d => d.rideIdx);
         dots.exit()
           .transition().duration(180)
-          .attr('r', 0).attr('opacity', 0)
+          .attr('width', 0).attr('height', 0).attr('opacity', 0)
           .remove();
-        const dotsEnter = dots.enter().append('circle')
+        const dotsEnter = dots.enter().append('rect')
           .attr('class', 'ride-dot')
-          .attr('r', 0)
+          .attr('width', 0).attr('height', 0)
           .attr('opacity', 0)
-          .attr('cx', d => x(d.day))
-          .attr('cy', d => dotsAreaH - (d.slot + 0.5) * dotSpacing)
-          .attr('stroke', 'rgba(255,255,255,0.75)')
+          .attr('x', d => x(d.day))
+          .attr('y', d => dotsAreaH - (d.slot + 0.5) * dotSpacing)
+          .attr('stroke', 'var(--bg-card)')
+          .attr('stroke-opacity', 0.75)
           .attr('stroke-width', 0.6);
         dotsEnter.merge(dots)
           .attr('fill', d => d.color)
           .transition().duration(280).ease(d3.easeCubicOut)
-          .attr('cx', d => x(d.day))
-          .attr('cy', d => dotsAreaH - (d.slot + 0.5) * dotSpacing)
-          .attr('r', dotR)
+          .attr('x', d => x(d.day) - dotR)
+          .attr('y', d => dotsAreaH - (d.slot + 0.5) * dotSpacing - dotR)
+          .attr('width', 2 * dotR).attr('height', 2 * dotR)
           .attr('opacity', 0.95);
 
         // +N overflow badges for days whose stacks exceed VISIBLE_CAP.
@@ -1709,7 +1724,7 @@ live from beautiful london, england
         aBars.exit().transition().duration(180).attr('opacity', 0).remove();
         const aEnter = aBars.enter().append('rect')
           .attr('class', 'dist-bar dist-bar-active')
-          .attr('rx', 3).attr('ry', 3)
+          .attr('rx', 0).attr('ry', 0)
           .attr('opacity', 0);
         aEnter.merge(aBars)
           .attr('fill', d => d.color)
@@ -1724,7 +1739,7 @@ live from beautiful london, england
         xBars.exit().transition().duration(180).attr('opacity', 0).remove();
         const xEnter = xBars.enter().append('rect')
           .attr('class', 'dist-bar dist-bar-extinct')
-          .attr('rx', 3).attr('ry', 3)
+          .attr('rx', 0).attr('ry', 0)
           .attr('opacity', 0);
         xEnter.merge(xBars)
           .attr('fill', d => `url(#dist-hatch-b${d.idx})`)
@@ -1796,7 +1811,7 @@ live from beautiful london, england
         sel.exit().remove();
         sel.enter().append('rect')
           .attr('class', 'dist-col-select')
-          .attr('rx', 3).attr('ry', 3)
+          .attr('rx', 0).attr('ry', 0)
           .merge(sel)
           .attr('x', d => colLeft(d) + 1)
           .attr('y', -4)
