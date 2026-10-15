@@ -3,21 +3,24 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#fafaf6">
-  <title>Lime Pricing Explorer · London</title>
+  <meta name="author" content="andrej zukov gregoric">
+  <link rel="stylesheet" type="text/css" href="/style.css">
+  <title>Lime Pricing Explorer - andrej zukov gregoric</title>
   <script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
   <style>
+    /* Page chrome (panel, fonts, header/footer, h1, links) comes from
+       /style.css. This sheet only styles the explorer's own controls, and
+       borrows the site's --bg / --bg-alt / --text / --link / --border so it
+       follows the dark scheme. */
     :root {
-      --bg: #fbf8ee;
-      --bg-card: #ffffff;
-      --bg-soft: #f6f1e1;
-      --line: #ece5cf;
-      --text: #2b2a23;
-      --text-dim: #6c6957;
-      --text-faint: #a8a392;
-      --lime: #82a838;
-      --lime-bright: #b5d976;
-      --lime-soft: #e8f1cf;
+      --bg-card: var(--bg);
+      --bg-soft: var(--bg-alt);
+      --line: var(--border);
+      --text-dim: #444;
+      --text-faint: #777;
+      --lime: var(--link);
+      --lime-bright: var(--link);
+      --lime-soft: var(--bg-alt);
       --orange: #d6864a;
       --orange-soft: #fbe2cb;
       --pink: #c9759c;
@@ -29,105 +32,25 @@
       --teal: #6dafa1;
       --teal-soft: #d0e7e1;
       --warn: #d35454;
-      --radius: 14px;
-      --radius-sm: 9px;
-      --shadow: 0 1px 2px rgba(40,38,28,0.04), 0 6px 24px rgba(40,38,28,0.05);
+      --radius: 0;
+      --radius-sm: 0;
+      --card-shadow: none;
     }
-    * { box-sizing: border-box; }
-    html, body {
-      margin: 0;
-      padding: 0;
-      background: var(--bg);
-      color: var(--text);
-      font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif;
-      font-feature-settings: "ss01", "cv11";
-      -webkit-font-smoothing: antialiased;
-      text-rendering: optimizeLegibility;
-      line-height: 1.5;
-      /* Kills the double-tap-to-zoom gesture on mobile (which would
-         otherwise fire when rapidly tapping a day on the calendar or
-         pressing the stepper ± buttons). Pinch-zoom + pan still work. */
-      touch-action: manipulation;
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --text-dim: #bbb;
+        --text-faint: #888;
+      }
     }
-    body {
-      background:
-        radial-gradient(1200px 600px at 80% -10%, rgba(181,217,118,0.20), transparent 60%),
-        radial-gradient(900px 500px at -10% 30%, rgba(213,230,240,0.45), transparent 60%),
-        var(--bg);
-      min-height: 100vh;
-      padding: 18px 18px 80px;
-    }
-    .wrap {
-      max-width: 920px;
-      margin: 0 auto;
-    }
-    header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 16px;
-      margin-bottom: 18px;
-    }
-    .brand {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      font-weight: 600;
-      letter-spacing: -0.01em;
-    }
-    .brand-dot {
-      width: 12px;
-      height: 12px;
-      border-radius: 50%;
-      background: var(--lime);
-      box-shadow: 0 0 0 3px var(--lime-soft);
-    }
-    .brand-name { color: var(--text-dim); font-size: 14px; }
-    .brand-name b { color: var(--text); font-weight: 600; }
-    nav a {
-      color: var(--text-dim);
-      text-decoration: none;
-      font-size: 14px;
-      padding: 6px 10px;
-      border-radius: 8px;
-      transition: color 0.15s, background 0.15s;
-    }
-    nav a:hover { color: var(--text); background: var(--bg-soft); }
+    article * { box-sizing: border-box; }
+    /* Kills the double-tap-to-zoom gesture on mobile (which would
+       otherwise fire when rapidly tapping a day on the calendar or
+       pressing the stepper ± buttons). Pinch-zoom + pan still work. */
+    body { touch-action: manipulation; }
 
-    h1 {
-      font-size: clamp(26px, 4.5vw, 38px);
-      line-height: 1.05;
-      letter-spacing: -0.02em;
-      font-weight: 600;
-      margin: 6px 0 6px;
-    }
-    h1 em {
-      font-style: normal;
-      color: var(--lime);
-    }
-    .lede {
-      color: var(--text-dim);
-      font-size: 14px;
-      max-width: 60ch;
-      margin: 0 0 16px;
-    }
-
-    .card {
-      background: var(--bg-card);
-      border: 1px solid var(--line);
-      border-radius: var(--radius);
-      padding: 18px 22px;
-      margin: 14px 0;
-      box-shadow: var(--shadow);
-    }
-    .card h2 {
-      font-size: 13px;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--text-faint);
-      margin: 0 0 10px;
-      font-weight: 600;
-    }
+    /* each section is a plain run of the post, not a boxed card */
+    .card { margin: 1.4rem 0 0; }
+    .card[hidden] { display: none; }
     .card h3 {
       font-size: 20px;
       letter-spacing: -0.02em;
@@ -293,7 +216,7 @@
       width: 100%;
       border-collapse: collapse;
       margin-top: 16px;
-      font-size: 14px;
+      font-size: 16px;
     }
     .results th, .results td {
       text-align: left;
@@ -366,12 +289,11 @@
     .winner b { color: var(--lime); }
 
     .notes {
-      font-size: 12px;
-      color: var(--text-faint);
+      font-size: 14px;
+      color: var(--text-dim);
       margin-top: 16px;
       line-height: 1.6;
     }
-    .notes a { color: var(--text-dim); }
 
     /* Distribution chart */
     .dist-tabs {
@@ -383,7 +305,7 @@
     .dist-tab {
       background: var(--bg-soft);
       border: 1px solid var(--line);
-      border-radius: 999px;
+      border-radius: 0;
       padding: 7px 16px;
       font-family: inherit;
       font-size: 13px;
@@ -393,12 +315,11 @@
       -webkit-tap-highlight-color: transparent;
       letter-spacing: 0.01em;
     }
-    .dist-tab:hover { background: #fff; border-color: var(--text-faint); }
+    .dist-tab:hover { background: var(--bg-card); border-color: var(--text-faint); }
     .dist-tab.active {
       background: var(--text);
-      color: #fff;
+      color: var(--bg-card);
       border-color: var(--text);
-      box-shadow: 0 1px 4px rgba(40,38,28,0.15);
     }
     .dist-wrap { aspect-ratio: 720 / 320; max-height: 380px; }
     /* Fill transitions only — geometry is animated via d3 transitions. */
@@ -494,7 +415,7 @@
     }
     .stepper-btn {
       width: 36px; height: 36px;
-      border-radius: 50%;
+      border-radius: 0;
       border: 1px solid var(--line);
       background: var(--bg-card);
       color: var(--text);
@@ -531,7 +452,7 @@
     .stepper-link:disabled { opacity: 0.35; cursor: not-allowed; }
     .stepper-close {
       width: 32px; height: 32px;
-      border-radius: 50%;
+      border-radius: 0;
       border: 1px solid transparent;
       background: transparent;
       color: var(--text-dim);
@@ -619,7 +540,7 @@
       background: var(--bg-card);
       border: 1px solid var(--line);
       border-radius: var(--radius-sm);
-      box-shadow: var(--shadow);
+      box-shadow: var(--card-shadow);
       padding: 12px;
       z-index: 100;
     }
@@ -681,7 +602,7 @@
     }
     .month-picker-cell.selected {
       background: var(--text);
-      color: #fff;
+      color: var(--bg-card);
       border-color: var(--text);
     }
     @media (max-width: 560px) {
@@ -692,27 +613,18 @@
       .month-picker-cell { padding: 14px 4px; font-size: 13px; }
     }
 
-    footer {
-      margin-top: 40px;
-      color: var(--text-faint);
-      font-size: 12px;
-      text-align: center;
-    }
-    footer a { color: var(--text-dim); }
+    .sources { font-size: 14px; color: var(--text-dim); }
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <header>
-      <div class="brand">
-        <span class="brand-dot"></span>
-        <span class="brand-name"><b>andrejzg</b> / lime</span>
-      </div>
-      <nav><a href="/">← home</a></nav>
-    </header>
-
-    <h1>How much does a <em>Lime</em> ride actually cost in London?</h1>
-    <p class="lede">PAYG vs LimePrime vs LimePass minute bundles — for your usage.</p>
+  <header>
+    <div><a href="/index.html">andrej zukov gregoric</a></div>
+  </header>
+<main>
+<article>
+<h1>Lime Pricing Explorer</h1>
+<span><time datetime="2026-04-26">April 26, 2026</time></span>
+<p>How much does a Lime ride actually cost in London? Pay as you go vs LimePrime vs LimePass minute bundles, for your usage.</p>
 
     <!-- Plans overview · hidden — we now auto-pick the optimal stack
          and surface the comparison in the results table below. Keep in
@@ -846,10 +758,16 @@
       </p>
     </section>
 
-    <footer>
+    <p class="sources">
       Data sources: Lime in-app screens · <a href="https://www.cityam.com/lime-squeezes-london-riders-with-quiet-price-hike/" target="_blank" rel="noopener">CityAM</a> · <a href="https://www.tubenotifications.co.uk/insights/london-lime-bikes" target="_blank" rel="noopener">Tube Notifications</a>. Pricing changes — verify in-app before riding.
-    </footer>
-  </div>
+    </p>
+</article>
+</main>
+<footer>
+<div>
+live from beautiful london, england
+</div>
+</footer>
 
   <script>
   (function() {
