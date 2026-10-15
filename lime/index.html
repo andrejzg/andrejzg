@@ -21,16 +21,17 @@
       --lime: var(--link);
       --lime-bright: var(--link);
       --lime-soft: var(--bg-alt);
-      /* chart series, one rule per kind of pricing:
-         red    = pay as you go (the fallback, same red as the warning stats)
-         purple = LimePrime, the monthly subscription
-         teal   = LimePass bundles, darker the longer the pass lasts */
-      --s-payg: #d64545;
-      --s-prime: #7b5fc4;
-      --s-b30: #b7e3e0;
-      --s-b60: #6fc4bd;
-      --s-b200: #2f9a92;
-      --s-b400: #166f69;
+      /* chart series, one strong hue each:
+         red  = pay as you go (the fallback, same red as the warning stats)
+         pink = LimePrime, the monthly subscription
+         LimePass bundles run warm to cool as the pass gets longer:
+         amber (30 min), green (60 min), blue (200 min), violet (400 min) */
+      --s-payg: #e03131;
+      --s-prime: #d6336c;
+      --s-b30: #f59f00;
+      --s-b60: #2f9e44;
+      --s-b200: #1c7ed6;
+      --s-b400: #7048e8;
       --orange: #d6864a;
       --orange-soft: #fbe2cb;
       --pink: #c9759c;
@@ -50,9 +51,12 @@
       :root {
         --text-dim: #bbb;
         --text-faint: #888;
-        --s-payg: #e06060;
-        --s-prime: #9b85d8;
-        --s-b400: #1f8a82;
+        --s-payg: #ff6b6b;
+        --s-prime: #f06595;
+        --s-b30: #fcc419;
+        --s-b60: #51cf66;
+        --s-b200: #4dabf7;
+        --s-b400: #9775fa;
       }
     }
     article * { box-sizing: border-box; }
@@ -767,7 +771,7 @@
       <div class="dist-stats" id="dist-stats"></div>
 
       <p class="notes">
-        Each square is one ride placed on a real day; each bar below shows when a pass is "active" — bought at its left edge, expiring at its right. Each ride takes the colour of the pass that covers it (teal, darker for longer passes); red rides fell back to PAYG. Each LimePass bundle covers usage only inside its validity window (1 / 3 / 7 / 30 days); the cheapest stack is brute-forced and scored against your rides + average length, with unused minutes valued at the combo's blended per-minute rate. London PAYG rates as of the November 2025 hike (£1 unlock + 31p/min, £1 flat under 5 min).
+        Each square is one ride placed on a real day; each bar below shows when a pass is "active" — bought at its left edge, expiring at its right. Each ride takes the colour of the pass that covers it (amber 30 min, green 60 min, blue 200 min, violet 400 min); red rides fell back to PAYG. Each LimePass bundle covers usage only inside its validity window (1 / 3 / 7 / 30 days); the cheapest stack is brute-forced and scored against your rides + average length, with unused minutes valued at the combo's blended per-minute rate. London PAYG rates as of the November 2025 hike (£1 unlock + 31p/min, £1 flat under 5 min).
       </p>
     </section>
 
@@ -1760,7 +1764,7 @@ live from beautiful london, england
           .attr('class', 'dist-bar-label')
           .attr('opacity', 0);
         labelsEnter.merge(barLabels)
-          .attr('fill', d => d.idx <= 1 ? '#0f2b29' : '#fff')
+          .attr('fill', d => d.idx === 0 ? '#1a1a1a' : '#fff')
           .text(d => d.label)
           .transition().duration(280).ease(d3.easeCubicOut)
           .attr('x', d => colLeft(d.start) + 6)
