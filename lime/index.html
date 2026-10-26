@@ -640,8 +640,26 @@
 <main>
 <article>
 <h1>Lime Pricing Explorer</h1>
-<span><time datetime="2026-04-26">April 26, 2026</time></span>
+<span><time datetime="2026-04-26">April 26, 2026</time> · prices last updated <time datetime="2026-10-26" id="last-updated">October 26, 2026</time></span>
 <p>How much does a Lime ride actually cost in London? Pay as you go vs LimePrime vs LimePass minute bundles, for your usage.</p>
+
+    <section class="card" id="prices">
+      <h2>Prices</h2>
+      <table class="results">
+        <thead>
+          <tr><th>Plan</th><th style="text-align:right;">Price</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><span class="swatch" style="background: var(--s-payg);"></span><span class="name">Pay as you go</span></td><td class="cost">£1 unlock + 31p/min</td></tr>
+          <tr><td><span class="swatch" style="background: var(--s-prime);"></span><span class="name">LimePrime</span><span class="sub">unlimited £1.70 rides up to 20 min</span></td><td class="cost">£6.99/mo</td></tr>
+          <tr><td><span class="swatch" style="background: var(--s-b30);"></span><span class="name">LimePass 30 min</span><span class="sub">use in 1 day</span></td><td class="cost">£4.59</td></tr>
+          <tr><td><span class="swatch" style="background: var(--s-b60);"></span><span class="name">LimePass 60 min</span><span class="sub">use in 3 days</span></td><td class="cost">£7.69</td></tr>
+          <tr><td><span class="swatch" style="background: var(--s-b200);"></span><span class="name">LimePass 200 min</span><span class="sub">use in 7 days</span></td><td class="cost">£19.94</td></tr>
+          <tr><td><span class="swatch" style="background: var(--s-b400);"></span><span class="name">LimePass 400 min</span><span class="sub">use in 30 days</span></td><td class="cost">£36.99</td></tr>
+        </tbody>
+      </table>
+      <p class="notes">Checked October 26, 2026.</p>
+    </section>
 
     <!-- Plans overview · hidden — we now auto-pick the optimal stack
          and surface the comparison in the results table below. Keep in
@@ -671,11 +689,11 @@
         </div>
         <div class="plan">
           <span class="tag" style="color: var(--blue); background: var(--blue-soft);">LimePass bundles</span>
-          <div class="price">From £3.99</div>
+          <div class="price">From £4.59</div>
           <ul>
-            <li>30 min · £3.99 · use in 1d</li>
-            <li>60 min · £6.99 · use in 3d</li>
-            <li>200 min · £18.99 · use in 7d</li>
+            <li>30 min · £4.59 · use in 1d</li>
+            <li>60 min · £7.69 · use in 3d</li>
+            <li>200 min · £19.94 · use in 7d</li>
             <li>400 min · £36.99 · use in 30d</li>
           </ul>
         </div>
@@ -721,7 +739,9 @@
         <div class="card-title">
           <h2>Where your rides land in the month</h2>
         </div>
-        <div class="month-picker" id="month-picker" data-open="false">
+        <!-- Month picker hidden 2026-10; the chart always shows the
+             current month. Kept in DOM because the JS still binds to it. -->
+        <div class="month-picker" id="month-picker" data-open="false" hidden>
           <button type="button" class="month-picker-btn" id="month-picker-btn" aria-haspopup="true" aria-expanded="false">
             <span id="month-picker-label">May 2026</span>
             <span class="caret" aria-hidden="true">▾</span>
@@ -775,6 +795,15 @@
       </p>
     </section>
 
+    <section class="card" id="price-updates">
+      <h2>Price updates</h2>
+      <p class="notes">Prices are checked on the 1st of each month. Newest first.</p>
+      <ul class="notes">
+        <li><time datetime="2026-10-26">October 26, 2026</time> · Started this log. LimePass bundles went up: 30 min £3.99 to £4.59, 60 min £6.99 to £7.69, 200 min £18.99 to £19.94; 400 min unchanged at £36.99. LimePrime unchanged at £6.99/mo with £1.70 rides up to 20 min.</li>
+        <li><time datetime="2025-11-24">November 24, 2025</time> · Pay as you go riding rate rose from 29p to 31p a minute, as reported by <a href="https://www.cityam.com/lime-squeezes-london-riders-with-quiet-price-hike/" target="_blank" rel="noopener">CityAM</a>. Earlier changes are only listed where a source mentions them.</li>
+      </ul>
+    </section>
+
     <p class="sources">
       Data sources: Lime in-app screens · <a href="https://www.cityam.com/lime-squeezes-london-riders-with-quiet-price-hike/" target="_blank" rel="noopener">CityAM</a> · <a href="https://www.tubenotifications.co.uk/insights/london-lime-bikes" target="_blank" rel="noopener">Tube Notifications</a>. Pricing changes — verify in-app before riding.
     </p>
@@ -794,9 +823,9 @@ live from beautiful london, england
     const PAYG = { unlock: 1.00, perMin: 0.31, shortFlat: 1.00, shortLimit: 5 };
     const PRIME = { sub: 6.99, shortFlat: 1.00, shortLimit: 5, midFlat: 1.70, midLimit: 20, postPerMin: 0.16 };
     const BUNDLES = [
-      { mins: 30,  price: 3.99,  validDays: 1  },
-      { mins: 60,  price: 6.99,  validDays: 3  },
-      { mins: 200, price: 18.99, validDays: 7  },
+      { mins: 30,  price: 4.59,  validDays: 1  },
+      { mins: 60,  price: 7.69,  validDays: 3  },
+      { mins: 200, price: 19.94, validDays: 7  },
       { mins: 400, price: 36.99, validDays: 30 },
     ];
 
@@ -1965,19 +1994,8 @@ live from beautiful london, england
           localStorage.removeItem(LS_KEY_V1);
         }
       } catch (e) { /* skip */ }
-      // Restore last-viewed month
-      try {
-        const saved = localStorage.getItem(LS_MONTH);
-        if (saved) {
-          const [ys, ms] = saved.split('-');
-          const y = +ys, m = +ms;
-          if (y >= 1970 && y <= 9999 && m >= 1 && m <= 12) {
-            currentYear = y;
-            currentMonth = m;
-            MONTH_DAYS = monthDaysOf(y, m);
-          }
-        }
-      } catch (e) { /* skip */ }
+      // No last-viewed month restore: the month picker is hidden, so the
+      // chart always opens on the current month.
       // Hydrate customCounts for the resolved month
       const key = monthKey(currentYear, currentMonth);
       const stored = customStore[key];
