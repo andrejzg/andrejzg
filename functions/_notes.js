@@ -7,6 +7,12 @@ export const NOTES = [
     title: "Lime Pricing Explorer",
     date: "2026-04-26",
   },
+  {
+    id: 2,
+    slug: "test",
+    title: "Learning Faster",
+    date: "2026-10-26",
+  },
 ];
 
 export const noteById = (n) => NOTES.find((note) => note.id === n);
